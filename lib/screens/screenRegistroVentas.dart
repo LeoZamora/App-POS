@@ -22,10 +22,10 @@ class _RegistroVentasState extends State<RegistroVentas> {
   ClienteModel? _clienteSeleccionado;
   bool _esCredito = false;
 
-  final List<Map<String, String>> productosDisponibles = [
-    {'name': 'Anillo Plata', 'value': '1'},
-    {'name': 'Pulsera Acero', 'value': '2'},
-    {'name': 'Collar Oro', 'value': '3'},
+  final List<Map<String, dynamic>> productosDisponibles = [
+    {'name': 'Anillo Plata', 'value': 1},
+    {'name': 'Pulsera Acero', 'value': 2},
+    {'name': 'Collar Oro', 'value': 3},
   ];
 
   Future<void> _imprimirFactura() async {
@@ -44,12 +44,16 @@ class _RegistroVentasState extends State<RegistroVentas> {
       if(printerService.selectedDeviceAddress == null) return;
     }
 
-    detalleVenta.map((item) => {
-      productos.add({
-        "nombre": item['idProducto'],
-        "cantidad": item['cantidad'],
-        "precio": item['precioUnitario'],
-      })
+    setState(() {
+      productos.clear();
+
+      detalleVenta.forEach((item) {
+        productos.add({
+          "nombre": item['nombre'],
+          "cantidad": item['cantidad'],
+          "precio": item['precioUnitario'],
+        });
+      });
     });
 
     venta = {
@@ -59,25 +63,37 @@ class _RegistroVentasState extends State<RegistroVentas> {
       "Observaciones": observacionesController.text,
     };
 
-    final bool success = await printerService.imprimirFactura(
-      context: context,
-      venta: venta,
-      productos: productos
-    );
+    print('VENTA: $venta');
+    print('PRODUCTOS: ${productos}');
+    print('Detalles: ${detalleVenta}');
 
-    if(success) {
+    if(productos.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Factura enviada'))
+          const SnackBar(content: Text('Ingrese uno o mas productos a facturar.'))
       );
+      return;
+    } else {
+      print('PRODUCTOS: $productos');
+      final bool success = await printerService.imprimirFactura(
+        context: context,
+        venta: venta,
+        productos: productos,
+        ivaPorcentaje: 15,
+        tipoCambio: 36.6243,
+      );
+      if(success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Factura enviada'))
+        );
+      }
     }
   }
 
   List<Map<String, dynamic>> detalleVenta = [];
-
   void agregarProducto() {
     setState(() {
       detalleVenta.add({
-        'idProducto': null,
+        'nombre': '',
         'cantidad': 1,
         'precioUnitario': 0.0,
         'total': 0.0,
@@ -207,18 +223,18 @@ class _RegistroVentasState extends State<RegistroVentas> {
                       child: Column(
                         children: [
                           DropdownButtonFormField<String>(
-                            value: producto['idProducto']?.toString(),
+                            value: (producto['nombre']?.isNotEmpty ?? false) ? producto["nombre"] : null,
                             hint: const Text("Producto"),
                             onChanged: (value) {
                               setState(() {
-                                detalleVenta[index]['idProducto'] = int.tryParse(value ?? '0');
+                                detalleVenta[index]['nombre'] = value;
                               });
                             },
-                            validator: (value) => value == null ? 'Seleccione un producto' : null,
+                            validator: (value) => value == null ? 'Seleccione un producto' : value,
                             items: productosDisponibles.map((prod) {
                               return DropdownMenuItem(
-                                value: prod['value'],
-                                child: Text(prod['name']!),
+                                value: prod['name'].toString(),
+                                child: Text(prod['name'].toString()),
                               );
                             }).toList(),
                           ),

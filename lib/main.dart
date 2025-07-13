@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:inversiones_ar/login/loginApp.dart';
-import 'package:path/path.dart';
 import 'package:inversiones_ar/services/servicesPrinter.dart';
 import 'package:provider/provider.dart';
 
@@ -22,8 +21,8 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.white),
-      home: LoginApp()
+      theme: ThemeData(colorSchemeSeed: Colors.white),
+      home: LoginApp(),
     );
   }
 }

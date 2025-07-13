@@ -46,6 +46,7 @@ class _LoginAppState extends State<LoginApp> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -55,14 +56,21 @@ class _LoginAppState extends State<LoginApp> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: <Widget>[
+                const Image(
+                  image: AssetImage('assets/imgs/logo.png'),
+                  width: 120,
+                  height: 160,
+                  fit: BoxFit.cover,
+                ),
+                const SizedBox(height: 50.0),
                 const Text(
-                  'Bienvenido',
-                  style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
+                  '!Bienvenido!',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 4.0),
                 const Text(
-                  'Inicia Sesión',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  'Por favor ingrese sus credenciales.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
                 ),
                 const SizedBox(height: 16.0),
                 TextFormField(
