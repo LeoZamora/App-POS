@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:inversiones_ar/login/loginApp.dart';
 import 'package:inversiones_ar/screens/screenRegistroVentas.dart';
 import 'package:inversiones_ar/screens/screenVentas.dart';
-import 'package:inversiones_ar/widgets/floatingButton.dart';
-import 'package:flutter_speed_dial/flutter_speed_dial.dart';
+// import 'package:flutter_speed_dial/flutter_speed_dial.dart';
+import 'dart:async';
+import 'package:internet_connection_checker/internet_connection_checker.dart';
+import 'package:provider/provider.dart';
+import 'package:inversiones_ar/services/servicesPrinter.dart';
 
 class DrawerItem {
   final String title;
@@ -21,6 +24,10 @@ class InicioScreen extends StatefulWidget {
 
 class _InicioScreenState extends State<InicioScreen> {
   int _selectedIndex = 0;
+  final connectionChecker = InternetConnectionChecker.instance;
+  bool isConnected = false;
+  late StreamSubscription<InternetConnectionStatus> _connectionStatus;
+
   List<Map<dynamic, dynamic>> menuCards = [{
     "title": 'Ventas',
     "icon": Icons.shopping_cart_outlined,
@@ -35,10 +42,22 @@ class _InicioScreenState extends State<InicioScreen> {
   @override
   void initState() {
     super.initState();
+    _connectionStatus = connectionChecker.onStatusChange.listen((status) {
+      setState(() {
+        isConnected = status == InternetConnectionStatus.connected;
+      });
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if(mounted) {
+        context.read<PrinterService>().requestBluetoothPermissions(context: context);
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final printerService = context.watch<PrinterService>();
     final itemsViewList = [
       DrawerItem(title: "Inicio", icon: Icons.home_outlined),
       DrawerItem(title: "Ventas", icon: Icons.shopping_cart_outlined),
@@ -53,17 +72,22 @@ class _InicioScreenState extends State<InicioScreen> {
     }
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.indigo,
         foregroundColor: Colors.white,
         title: const Text('Inversiones Zafiro'),
+        actions: [
+          Icon( isConnected ? Icons.wifi : Icons.wifi_off, color: isConnected ? Colors.green : Colors.redAccent),
+          Padding(padding: EdgeInsets.symmetric(horizontal: 10))
+        ]
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: GridView.builder(
           itemCount: menuCards.length,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2, // 2 columnas
+            crossAxisCount: 2,
             mainAxisSpacing: 16,
             crossAxisSpacing: 16,
             childAspectRatio: 1,
@@ -186,30 +210,84 @@ class _InicioScreenState extends State<InicioScreen> {
           ],
         ),
       ),
-      floatingActionButton: SpeedDial(
-        icon: Icons.more_vert,
-        activeIcon: Icons.close,
-        backgroundColor: Colors.indigo,
-        foregroundColor: Colors.white,
-        tooltip: 'Opciones',
-        buttonSize: const Size(50, 50),
-        spaceBetweenChildren: 12,
-        visible: true,
-        closeManually: false,
-        curve: Curves.bounceIn,
-        overlayColor: Colors.black,
-        overlayOpacity: 0,
-        elevation: 8.0,
-        children: [
-          SpeedDialChild(
-            child: Icon(Icons.sync),
-            label: 'Sincronizar Ventas',
-            foregroundColor: Colors.white,
-            backgroundColor: Colors.green,
-            onTap: () => print('Imprimir'),
+      // floatingActionButton: SpeedDial(
+      //   icon: Icons.more_vert,
+      //   activeIcon: Icons.close,
+      //   backgroundColor: Colors.indigo,
+      //   foregroundColor: Colors.white,
+      //   tooltip: 'Opciones',
+      //   buttonSize: const Size(50, 50),
+      //   spaceBetweenChildren: 12,
+      //   visible: true,
+      //   closeManually: false,
+      //   curve: Curves.bounceIn,
+      //   overlayColor: Colors.black,
+      //   overlayOpacity: 0,
+      //   elevation: 8.0,
+      //   children: [
+      //     SpeedDialChild(
+      //       child: Icon(Icons.sync),
+      //       label: 'Sincronizar Ventas',
+      //       foregroundColor: Colors.white,
+      //       backgroundColor: Colors.green,
+      //       onTap: () => print('Imprimir'),
+      //     ),
+      //   ],
+      // ),
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          padding: const EdgeInsets.all(4.0),
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(50),
+            boxShadow: const [
+             BoxShadow(color: Colors.black45, blurRadius: 8, offset: Offset(0, 8))
+            ]
           ),
-        ],
-      )
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Padding(padding: const EdgeInsets.symmetric(horizontal: 5)),
+              IconButton(
+                onPressed: () => {},
+                icon: Icon(
+                  Icons.sync,
+                  color: isConnected ? Colors.green : Colors.black,
+                ),
+                style: ButtonStyle(
+                  iconSize: WidgetStateProperty.all<double>(20),
+                ),
+                tooltip: "Sincronizar Ventas",
+              ),
+              Spacer(),
+              FloatingActionButton.small(
+                onPressed: () => {},
+                child: const Icon(Icons.add),
+                backgroundColor: Colors.indigo,
+                foregroundColor: Colors.white,
+                elevation: 0,
+              ),
+              Spacer(),
+              IconButton(
+                onPressed: printerService.isConnecting ? null : () {
+                  printerService.showDeviceSelectionDialog(context);
+                },
+                icon: Icon(
+                  Icons.print_outlined,
+                  color: printerService.selectedDeviceAddress != null ? Colors.indigo : Colors.black,
+                ),
+                style: ButtonStyle(
+                  iconSize: WidgetStateProperty.all<double>(20),
+                ),
+                tooltip: "Sincronizar Ventas",
+              ),
+              Padding(padding: const EdgeInsets.symmetric(horizontal: 5))
+            ],
+          )
+        )
+      ),
     );
   }
 }

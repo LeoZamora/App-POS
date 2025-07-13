@@ -15,25 +15,6 @@ class VentasScreen extends StatefulWidget {
 
 class _VentasScreenState extends State<VentasScreen> {
   late Future<List<VentaModel>> _ventas;
-  // late List<Map<String, dynamic>> ventas = [{
-  //   "IdVenta": 0001,
-  //   "FechaRegistro": "01/01/2023",
-  //   "NoVenta": 0001,
-  //   "IdCliente": 0001,
-  //   "Credito": 0001,
-  //   "Observaciones": "Venta de productos varios",
-  //   "EnviarA": "Cliente",
-  // }];
-  final venta = {
-    "NoVenta": 1,
-    "IdCliente": 123,
-    "FechaRegistro": "2023-07-05T00:00:00",
-    "Observaciones": "Venta de productos varios",
-  };
-  final productos = [
-    {"nombre": "Anillo de Oro", "cantidad": 1, "precio": 250.00, "material": 'Oro 18k', "peso": '100gr'},
-    {"nombre": "Anillo de Plata", "cantidad": 2, "precio": 250.00, "material": 'Plata', "peso": '100gr'},
-  ];
 
   final DbHelper dbHelper = DbHelper();
   bool isLoading = true;
@@ -47,32 +28,6 @@ class _VentasScreenState extends State<VentasScreen> {
         context.read<PrinterService>().requestBluetoothPermissions(context: context);
       }
     });
-  }
-
-  Future<void> _imprimirFactura() async {
-    print("Imprimiendo factura...");
-    final printerService = context.read<PrinterService>();
-    if(printerService.isPrinting || printerService.isPrinting) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ya se está imprimiendo una factura.'))
-      );
-      return;
-    }
-
-    if(!mounted) return;
-
-    if(printerService.selectedDeviceAddress == null) {
-      await printerService.showDeviceSelectionDialog(context);
-      if(printerService.selectedDeviceAddress == null) return;
-    }
-
-    final bool success = await printerService.imprimirFactura(
-      context: context,
-      venta: venta,
-      productos: productos,
-      ivaPorcentaje: 15,
-      tipoCambio: 36.6243,
-    );
   }
 
   @override
@@ -139,7 +94,7 @@ class _VentasScreenState extends State<VentasScreen> {
                           ),
                           const Spacer(),
                           IconButton(
-                            onPressed: _imprimirFactura,
+                            onPressed: () => {},
                             icon: Icon(
                               Icons.visibility_outlined,
                               color: Colors.amber.withAlpha(250),
