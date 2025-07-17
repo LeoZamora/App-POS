@@ -1,4 +1,3 @@
-// import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -49,25 +48,27 @@ class PrinterService with ChangeNotifier {
 
     double subtotal = 0;
     for (var p in productos) {
-      subtotal += p['cantidad'] * p['precio'];
+      subtotal += p['cantidad'] * p['precioUnitario'];
     }
     double iva = subtotal * (ivaPorcentaje / 100);
     double total = subtotal + iva;
 
     buffer.writeln('       Tel: +505 8888-8888       '.toString());
-    buffer.writeln('Factura No:                ${venta["NoVenta"].toString().padLeft(5, '0')}');
-    buffer.writeln('Cliente :                  ${venta["IdCliente"].toString()}');
-    buffer.writeln('Fecha:                ${venta["FechaRegistro"]?.substring(0, 10)}');
+    buffer.writeln('Factura No:                ${venta["noVenta"].toString().padLeft(5, '0')}');
+    buffer.writeln('Credito:                      ${venta["credito"] == true ? 'SI' : 'NO'}');
+    buffer.writeln('Cliente : ${venta["idCliente"].toString().padLeft(20)}');
+    buffer.writeln('Fecha:                ${venta["fechaRegistro"]?.substring(0, 10)}');
     buffer.writeln('');
+    buffer.writeln('Enviar a:                ${venta["enviarA"]}');
     buffer.writeln('Descripcion:');
-    buffer.writeln('${venta["Observaciones"] ?? "- - -"}');
+    buffer.writeln('${venta["observaciones"] ?? "- - -"}');
     buffer.writeln('-------------------------------');
     buffer.writeln('Cant| Producto        | Total');
     buffer.writeln('-------------------------------');
     for (var p in productos) {
       final cant = p['cantidad'].toString().padLeft(1).substring(0, 1);
       final nombre = (p['nombre'] as String).padRight(16).substring(0, 16);
-      final totalLinea = (p['cantidad'] * p['precio'])
+      final totalLinea = (p['cantidad'] * p['precioUnitario'])
           .toStringAsFixed(2)
           .padLeft(6)
           .substring(0, 6);

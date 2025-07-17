@@ -1,4 +1,5 @@
 import 'package:inversiones_ar/dbModels/dbModels.dart';
+import 'package:inversiones_ar/requestHttp/requestHttp.dart' as requests;
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
@@ -11,7 +12,9 @@ class DbHelper {
   factory DbHelper() => _instance;
 
   Future<Database> get database async {
-    if (_database!.isOpen) return _database!;
+    final db = _database;
+    if (db != null && db.isOpen) return db;
+
     _database = await _initDatabase();
     return _database!;
   }
@@ -126,7 +129,7 @@ class DbHelper {
           direccion TEXT,
           telefono TEXT,
           fechaRegistro TEXT NOT NULL,
-          usuarioRegistro INTEGER NOT NULL, -- bigint se mapea a INTEGER
+          usuarioRegistro TEXT NOT NULL,
           estado INTEGER NOT NULL,
           FOREIGN KEY (idTipoProveedor) REFERENCES TipoProveedor (idTipoProveedor) ON DELETE CASCADE
         )
@@ -140,7 +143,7 @@ class DbHelper {
           observaciones TEXT,
           predeterminado INTEGER NOT NULL,
           fechaRegistro TEXT NOT NULL,
-          usuarioRegistro INTEGER NOT NULL, -- bigint se mapea a INTEGER
+          usuarioRegistro TEXT NOT NULL,
           estado INTEGER NOT NULL,
           FOREIGN KEY (idProveedor) REFERENCES Proveedor (idProveedor) ON DELETE CASCADE,
           FOREIGN KEY (idProducto) REFERENCES Producto (idProducto) ON DELETE CASCADE
@@ -155,9 +158,11 @@ class DbHelper {
           credito INTEGER NOT NULL,
           observaciones TEXT,
           enviarA TEXT,
+          sincronizada INTEGER NOT NULL,
           fechaRegistro TEXT NOT NULL,
           usuarioRegistro TEXT NOT NULL,
           estado INTEGER NOT NULL,
+          total REAL,
           FOREIGN KEY (idCliente) REFERENCES Cliente (idCliente) ON DELETE CASCADE
         )
     ''');
@@ -170,86 +175,35 @@ class DbHelper {
           cantidad REAL NOT NULL,
           precioUnitario REAL NOT NULL,
           observaciones TEXT,
-          estado BOOLEAN NOT NULL,
+          estado INTEGER NOT NULL,
           FOREIGN KEY (idVenta) REFERENCES Venta (idVenta) ON DELETE CASCADE,
           FOREIGN KEY (idProducto) REFERENCES Producto (idProducto) ON DELETE CASCADE
         )
     ''');
 
-        // HASTA AQUI LOS MODELOS DE LA BASE DE DATOS
         await db.execute('''
-        CREATE TABLE DetalleCompra (
-          idDetalleCompra INTEGER PRIMARY KEY AUTOINCREMENT,
-          idCompra INTEGER NOT NULL,
-          idProducto INTEGER NOT NULL,
-          cantidad REAL NOT NULL,
-          costoUnitario REAL NOT NULL,
-          observaciones TEXT,
-          FOREIGN KEY (IdCompra) REFERENCES Compra (IdCompra) ON DELETE CASCADE,
-          FOREIGN KEY (idProducto) REFERENCES Producto (idProducto) ON DELETE CASCADE
+        CREATE TABLE TipoProducto (
+          idTipoProducto INTEGER PRIMARY KEY AUTOINCREMENT,
+          nombre TEXT NOT NULL
         )
-    ''');
-
-        await db.execute('''
-        CREATE TABLE Compra (
-          idCompra INTEGER PRIMARY KEY AUTOINCREMENT,
-          noOrden TEXT,
-          idProveedor INTEGER NOT NULL,
-          aprobada INTEGER NOT NULL,
-          observaciones TEXT,
-          fechaRegistro TEXT NOT NULL,
-          usuarioRegistro TEXT NOT NULL,
-          estado INTEGER NOT NULL,
-          FOREIGN KEY (idProveedor) REFERENCES Proveedor (idProveedor) ON DELETE CASCADE
-        )
-    ''');
-
-        await db.execute('''
-        CREATE TABLE CXC (
-          idCXC INTEGER PRIMARY KEY AUTOINCREMENT,
-          noCXC TEXT,
-          idCliente INTEGER NOT NULL,
-          observaciones TEXT,
-          fechaRegistro TEXT NOT NULL,
-          usuarioRegistro TEXT NOT NULL,
-          estado INTEGER NOT NULL,
-          FOREIGN KEY (idCliente) REFERENCES Cliente (idCliente) ON DELETE CASCADE
-        )
-    ''');
-
-        await db.execute('''
-        CREATE TABLE DetalleCXC (
-          idDetalleCXC INTEGER PRIMARY KEY AUTOINCREMENT,
-          idCXC INTEGER NOT NULL,
-          idVenta INTEGER NOT NULL,
-          monto REAL NOT NULL,
-          nCuotas INTEGER NOT NULL,
-          diasCredito INTEGER NOT NULL,
-          saldo REAL NOT NULL,
-          cancelado INTEGER NOT NULL,
-          fechaRegistro TEXT,
-          usuarioRegistro TEXT NOT NULL,
-          estado INTEGER NOT NULL,
-          FOREIGN KEY (idCXC) REFERENCES CXC (idCXC) ON DELETE CASCADE,
-          FOREIGN KEY (idVenta) REFERENCES Venta (idVenta) ON DELETE CASCADE
-        )
-    ''');
+        ''');
       },
     );
   }
 
-  Future<List<ProductoModel>> getProductos() async {
+  Future<List<ProductoModel>> getProductos(String tipoProducto) async {
     final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query("Producto");
+    final List<Map<String, dynamic>> maps = await db.query("Producto",
+        where: 'tipoProducto = ?', whereArgs: [tipoProducto]
+    );
 
-    return maps.map((map) => ProductoModel.fromMap(map)).toList();
-  }
+    print('Productos: ${maps.toList().toString()}');
 
-  Future<List<VentaModel>> getVentas() async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query('Ventas');
-
-    return maps.map((map) => VentaModel.fromMap(map)).toList();
+    return maps.map((map) {
+      final mappedData = Map<String, dynamic>.from(map);
+      mappedData['estado'] = map['estado'] == 1 ? true : false;
+      return ProductoModel.fromMap(mappedData);
+    }).toList();
   }
 
   Future<List<DetalleVentaModel>> getDetalleVentas(int idVenta) async {
@@ -263,11 +217,156 @@ class DbHelper {
     return maps.map((map) => DetalleVentaModel.fromMap(map)).toList();
   }
 
-  Future<int> insertVenta(VentaModel venta) async {
+  Future<void> registrarVenta(VentaModel venta, List<DetalleVentaModel> detalles) async {
     final db = await database;
-    return await db.insert('Ventas',
-        venta.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace
+    
+    db.transaction((txn) async {
+      int idVenta = await txn.insert('Venta', {
+        'noVenta': venta.noVenta,
+        'idCliente': venta.idCliente,
+        'credito': venta.credito == true ? 1 : 0,
+        'observaciones': venta.observaciones,
+        'sincronizada': venta.sincronizada == true ? 1 : 0,
+        'enviarA': venta.enviarA,
+        'fechaRegistro': venta.fechaRegistro,
+        'usuarioRegistro': venta.usuarioRegistro,
+        'estado':  1,
+        'total': venta.total
+      });
+      
+      for(var detalle in detalles) {
+        await txn.insert('DetalleVenta', {
+          'idVenta': idVenta,
+          'idProducto': detalle.idProducto,
+          'cantidad': detalle.cantidad,
+          'precioUnitario': detalle.precioUnitario,
+          'observaciones': detalle.observaciones,
+          'estado': 1
+        });
+      }
+    });
+  }
+
+  Future<List<VentaModel>> getVentas() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('Venta');
+
+    print('Ventas: ${maps.toList().toString()}');
+
+    return maps.map((map) {
+      final mappedData = Map<String, dynamic>.from(map);
+      mappedData['credito'] = map['credito'] == 1 ? true : false;
+      mappedData['sincronizada'] = map['sincronizada'] == 1 ? true : false;
+      mappedData['estado'] = map['estado'] == 1 ? true : false;
+      return VentaModel.fromMap(mappedData);
+    }).toList();
+  }
+
+  Future<List<ClienteModel>> getClientesLocal() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('Cliente');
+    print('Clientes: ${maps.toList().toString()}');
+    return maps.map((map) {
+      final mappedData = Map<String, dynamic>.from(map);
+      mappedData['personaNatural'] = map['personaNatural'] == 1 ? true : false;
+      mappedData['estado'] = map['estado'] == 1 ? true : false;
+      return ClienteModel.fromMap(mappedData);
+    }).toList();
+  }
+
+  Future<List<TipoProductoModel>> insertTipoProducto(List<TipoProductoModel> tipoProducto) async {
+    final db = await database;
+
+    final count = Sqflite.firstIntValue(
+      await db.rawQuery('SELECT COUNT(*) FROM TipoProducto'),
     );
+
+    if(count == 0) {
+      for(var tipo in tipoProducto) {
+        await db.insert('TipoProducto', tipo.toMap());
+      }
+    }
+
+    final List<Map<String, dynamic>> maps = await db.query('TipoProducto');
+    return maps.map((map) => TipoProductoModel.fromMap(map)).toList();
+  }
+
+  Future<void> deleteTipoProducto() async {
+    final db = await database;
+    await db.delete('TipoProducto');
+    print('Delete All');
+  }
+
+  Future<List<TipoProductoModel>> getTipoProducto() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('TipoProducto');
+
+    return maps.map((map) => TipoProductoModel.fromMap(map)).toList();
+  }
+
+  Future<bool> sincronizarProductosDesdeAPI(String tipoProducto) async {
+    try {
+      final List<ProductoModel> productosAPI = await requests.getProductos(tipoProducto);
+      final List<ClienteModel> clientesAPI = await requests.getClientes();
+
+
+      print(productosAPI.toString());
+      final db = await DbHelper().database;
+
+      for(var cliente in clientesAPI) {
+        final List<Map<String, dynamic>> existentes = await db.query(
+          'Cliente',
+          where: 'codigo = ?',
+          whereArgs: [cliente.codigo],
+        );
+
+        final clienteMap = cliente.toMap();
+        clienteMap['personaNatural'] = cliente.personaNatural == true ? 1 : 0;
+        clienteMap['estado'] = cliente.estado == true ? 1 : 0;
+
+        if(existentes.isEmpty) {
+          print('Creados');
+          await db.insert('Cliente', clienteMap);
+          print('Creados');
+        } else {
+          print('Actualizados');
+          await db.update(
+            'Cliente',
+              clienteMap,
+            where: 'codigo = ?',
+            whereArgs: [cliente.codigo],
+          );
+        }
+      }
+
+      for (final producto in productosAPI) {
+        final List<Map<String, dynamic>> existentes = await db.query(
+          'Producto',
+          where: 'idProducto = ?',
+          whereArgs: [producto.idProducto],
+        );
+
+        final productoMap = producto.toMap();
+        productoMap['estado'] = producto.estado == true ? 1 : 0;
+
+        if (existentes.isEmpty) {
+          print('Creadas');
+          await db.insert('Producto', productoMap);
+        } else {
+          print('Actualizada');
+          await db.update(
+            'Producto',
+            productoMap,
+            where: 'idProducto = ?',
+            whereArgs: [producto.idProducto],
+          );
+        }
+      }
+      print("Productos sincronizados correctamente.");
+      return true;
+    } catch (e) {
+      print("Error al sincronizar productos: $e");
+      return false;
+    }
   }
 }

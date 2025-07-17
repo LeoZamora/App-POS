@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:inversiones_ar/screens/mainScreen.dart';
+import 'package:inversiones_ar/requestHttp/requestHttp.dart';
+import 'package:provider/provider.dart';
+import 'package:inversiones_ar/services/stateServices.dart';
+import 'package:go_router/go_router.dart';
+import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 
 class LoginApp extends StatefulWidget {
   const LoginApp({super.key});
@@ -21,16 +25,21 @@ class _LoginAppState extends State<LoginApp> {
     super.dispose();
   }
 
-  void _login() {
+  Future<void> _login() async {
     String username = _usernameController.text;
     String password = _passwordController.text;
 
     if (_formKey.currentState!.validate()) {
-      if (username == 'admin' && password == 'admin') {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => InicioScreen()),
-        );
+      final result = await postLogin({
+        'usuario': username,
+        'password': password
+      });
+      final infoToken = JWT.decode(result['token'].toString());
+      print(infoToken.payload);
+      if (result['token'] != null) {
+        final authServices = context.read<StateServices>();
+        authServices.login(true);
+        context.go('/');
       } else {
         ScaffoldMessenger.of(
           context,
