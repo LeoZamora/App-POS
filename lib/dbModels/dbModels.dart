@@ -80,7 +80,7 @@ class UnidadMedidaModel {
 
 class ProductoModel {
   int? idProducto;
-  int? IdSubCatProd;
+  int? idSubCatProd;
   int? idUnidadMedida;
   String? codigo;
   String? nombre;
@@ -93,11 +93,11 @@ class ProductoModel {
   String? tipoProducto;
   String? fechaRegistro;
   String? usuarioRegistro;
-  int? estado;
+  bool? estado;
 
   ProductoModel({
     this.idProducto,
-    this.IdSubCatProd,
+    this.idSubCatProd,
     this.idUnidadMedida,
     this.codigo,
     this.nombre,
@@ -116,7 +116,7 @@ class ProductoModel {
   Map<String, dynamic> toMap() {
     return {
       'idProducto': idProducto,
-      'IdSubCatProd': IdSubCatProd,
+      'idSubCatProd': idSubCatProd,
       'idUnidadMedida': idUnidadMedida,
       'codigo': codigo,
       'nombre': nombre,
@@ -136,7 +136,7 @@ class ProductoModel {
   factory ProductoModel.fromMap(Map<String, dynamic> map) {
     return ProductoModel(
       idProducto: map['idProducto'],
-      IdSubCatProd: map['IdSubCatProd'],
+      idSubCatProd: map['idSubCatProd'],
       idUnidadMedida: map['idUnidadMedida'],
       codigo: map['codigo'],
       nombre: map['nombre'],
@@ -304,7 +304,7 @@ class ProveedorModel {
   String? telefono;
   String? fechaRegistro;
   int? usuarioRegistro;
-  int? estado;
+  bool? estado;
 
   ProveedorModel({
     this.idProveedor,
@@ -330,7 +330,7 @@ class ProveedorModel {
       'telefono': telefono,
       'fechaRegistro': fechaRegistro,
       'usuarioRegistro': usuarioRegistro,
-      'estado': estado,
+      'estado': estado == true ? 1 : 0,
     };
   }
 
@@ -345,7 +345,7 @@ class ProveedorModel {
       telefono: map['telefono'],
       fechaRegistro: map['fechaRegistro'],
       usuarioRegistro: map['usuarioRegistro'],
-      estado: map['estado'],
+      estado: map['estado'] == 1,
     );
   }
 }
@@ -400,13 +400,15 @@ class ProveedorProductoModel {
 
 class VentaModel {
   int? idVenta;
-  String? noVenta;
-  int? idCliente;
-  bool? credito;
-  String? observaciones;
-  String? enviarA;
+  String? noVenta; //
+  int? idCliente; //
+  String? cliente;
+  bool? credito; //
+  String? observaciones; //
+  String? enviarA; //
+  bool? sincronizada;
   String? fechaRegistro;
-  String? usuarioRegistro;
+  String? usuarioRegistro; //
   bool? estado;
   double? total;
 
@@ -414,9 +416,11 @@ class VentaModel {
     this.idVenta,
     this.noVenta,
     this.idCliente,
+    this.cliente,
     this.credito,
     this.observaciones,
     this.enviarA,
+    this.sincronizada,
     this.fechaRegistro,
     this.usuarioRegistro,
     this.estado,
@@ -428,9 +432,11 @@ class VentaModel {
       'idVenta': idVenta,
       'noVenta': noVenta,
       'idCliente': idCliente,
+      'cliente': cliente,
       'credito': credito,
       'observaciones': observaciones,
       'enviarA': enviarA,
+      'sincronizada': sincronizada,
       'fechaRegistro': fechaRegistro,
       'usuarioRegistro': usuarioRegistro,
       'estado': estado,
@@ -443,23 +449,16 @@ class VentaModel {
       idVenta: map['idVenta'],
       noVenta: map['noVenta'],
       idCliente: map['idCliente'],
+      cliente: map['cliente'],
       credito: map['credito'],
       observaciones: map['observaciones'],
       enviarA: map['enviarA'],
+      sincronizada: map['sincronizada'],
       fechaRegistro: map['fechaRegistro'],
       usuarioRegistro: map['usuarioRegistro'],
       estado: map['estado'],
       total: map['total'],
     );
-  }
-
-  Future<VentaModel> fetchAlbum() async {
-    final response = await http.get(Uri.parse('http://localhost:5091/api/Venta'));
-    if (response.statusCode == 200) {
-      return VentaModel.fromMap(jsonDecode(response.body) as Map<String, dynamic>);
-    } else {
-      throw Exception('Failed to load album');
-    }
   }
 }
 
@@ -467,7 +466,7 @@ class DetalleVentaModel {
   int? IdDetalleVenta;
   int? idVenta;
   int? idProducto;
-  double? Cantidad;
+  double? cantidad;
   double? precioUnitario;
   String? observaciones;
 
@@ -475,7 +474,7 @@ class DetalleVentaModel {
     this.IdDetalleVenta,
     this.idVenta,
     this.idProducto,
-    this.Cantidad,
+    this.cantidad,
     this.precioUnitario,
     this.observaciones,
   });
@@ -485,7 +484,7 @@ class DetalleVentaModel {
       'IdDetalleVenta': IdDetalleVenta,
       'idVenta': idVenta,
       'idProducto': idProducto,
-      'Cantidad': Cantidad,
+      'cantidad': cantidad,
       'precioUnitario': precioUnitario,
       'observaciones': observaciones,
     };
@@ -496,9 +495,52 @@ class DetalleVentaModel {
       IdDetalleVenta: map['IdDetalleVenta'],
       idVenta: map['idVenta'],
       idProducto: map['idProducto'],
-      Cantidad: map['Cantidad'],
+      cantidad: map['cantidad'],
       precioUnitario: map['precioUnitario'],
       observaciones: map['observaciones'],
     );
   }
 }
+
+class TipoProductoModel {
+  int? idTipoProducto;
+  String? nombre;
+
+  TipoProductoModel({
+    this.idTipoProducto,
+    this.nombre,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'idTipoProducto': idTipoProducto,
+      'nombre': nombre,
+    };
+  }
+
+  factory TipoProductoModel.fromMap(Map<String, dynamic> map) {
+    return TipoProductoModel(
+      idTipoProducto: map['idTipoProducto'],
+      nombre: map['nombre'],
+    );
+  }
+}
+
+
+// {
+// "noVenta": "string",
+// "idCliente": 0,
+// "credito": true,
+// "observaciones": "string",
+// "enviarA": "string",
+// "usuarioRegistro": "string",
+// "detalleVenta": [
+// {
+// "idVenta": 0,
+// "idProducto": 0,
+// "cantidad": 0,
+// "precioUnitario": 0,
+// "observaciones": "string"
+// }
+// ]
+// }

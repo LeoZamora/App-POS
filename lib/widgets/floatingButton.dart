@@ -19,8 +19,7 @@ class FloatingWidgetButton extends StatelessWidget {
       tooltip: tooltip,
       backgroundColor: Colors.indigo,
       foregroundColor: Colors.white,
-      child: Icon(icon),
-      mini: true,
+      child: Icon(icon)
     );
   }
 }
