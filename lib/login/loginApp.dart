@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:inversiones_ar/services/stateServices.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
 
 class LoginApp extends StatefulWidget {
   const LoginApp({super.key});
@@ -17,6 +18,7 @@ class _LoginAppState extends State<LoginApp> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   late bool _showPass = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -30,25 +32,84 @@ class _LoginAppState extends State<LoginApp> {
     String password = _passwordController.text;
 
     if (_formKey.currentState!.validate()) {
-      final result = await postLogin({
-        'usuario': username,
-        'password': password
+      setState(() {
+        _isLoading = true;
       });
-      final infoToken = JWT.decode(result['token'].toString());
-      print(infoToken.payload);
-      if (result['token'] != null) {
-        final authServices = context.read<StateServices>();
-        authServices.login(true);
-        context.go('/');
-      } else {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Credenciales Incorrectas')));
+      try {
+        // final result = await postLogin({
+        //   'usuario': username,
+        //   'password': password
+        // });
+
+        // final infoToken = JWT.decode(result['token'].toString());
+        // print(infoToken.payload);
+        print('${username} - ${password}');
+        if (username == 'POSVentas' && password == 'admin1234') {
+          final authServices = context.read<StateServices>();
+          authServices.login(true);
+          context.go('/');
+        } else {
+          return showDialog<void>(
+            context: context,
+            barrierDismissible: false, // user must tap button!
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: const Text('Credenciales Incorrectas'),
+                content: const SingleChildScrollView(
+                  child: ListBody(
+                    children: <Widget>[
+                      Text('Por favor verifique sus credenciales.'),
+                    ],
+                  ),
+                ),
+                actions: <Widget>[
+                  TextButton(
+                    child: const Text('Cerrar'),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      setState(() {
+                        _isLoading = false;
+                      });
+                    },
+                  ),
+                ],
+              );
+            }
+          );
+        }
+      } catch (e) {
+        return showDialog<void>(
+          context: context,
+          barrierDismissible: false, // user must tap button!
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Credenciales Incorrectas'),
+              content: const SingleChildScrollView(
+                child: ListBody(
+                  children: <Widget>[
+                    Text('Por favor verifique sus credenciales.'),
+                  ],
+                ),
+              ),
+              actions: <Widget>[
+                TextButton(
+                  child: const Text('Cerrar'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    setState(() {
+                      _isLoading = false;
+                    });
+                  },
+                ),
+              ],
+            );
+          }
+        );
       }
     } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error al iniciar sesion')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al iniciar sesión')),
+      );
     }
   }
 
@@ -127,7 +188,13 @@ class _LoginAppState extends State<LoginApp> {
                   },
                 ),
                 const SizedBox(height: 32.0),
-                ElevatedButton(
+                _isLoading
+                    ? LoadingAnimationWidget.flickr(
+                  leftDotColor: Colors.indigo,
+                  rightDotColor: Colors.grey,
+                  size: 50,
+                )
+                : ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.indigo,
                     foregroundColor: Colors.white,

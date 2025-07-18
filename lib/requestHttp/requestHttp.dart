@@ -102,7 +102,7 @@ Future<Map<String, dynamic>> postLogin(Map<String, String> data) async {
 
 Future<Map<String, dynamic>?> postVentas(Map<String, dynamic> data) async {
   final String urlApi = '${server}api/Venta';
-
+  print(data.toString());
   try {
     final response = await http.post(Uri.parse(urlApi),
       headers: <String, String>{
@@ -111,6 +111,8 @@ Future<Map<String, dynamic>?> postVentas(Map<String, dynamic> data) async {
       body: json.encode(data)
     );
     print('Response: ${response.statusCode}');
+    print('Response: ${response.body}');
+    print('Response: $response');
     if(response.statusCode == 201) {
       Map<String, dynamic> responseBody = jsonDecode(response.body);
       return {

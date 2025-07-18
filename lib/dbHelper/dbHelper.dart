@@ -293,6 +293,7 @@ class DbHelper {
 
   Future<void> deleteTipoProducto() async {
     final db = await database;
+
     await db.delete('TipoProducto');
     print('Delete All');
   }
@@ -306,6 +307,7 @@ class DbHelper {
 
   Future<bool> sincronizarProductosDesdeAPI(String tipoProducto) async {
     try {
+      List<VentaModel> _ventas = await getVentas();
       final List<ProductoModel> productosAPI = await requests.getProductos(tipoProducto);
       final List<ClienteModel> clientesAPI = await requests.getClientes();
 

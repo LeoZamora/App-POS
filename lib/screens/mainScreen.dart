@@ -171,95 +171,6 @@ class _InicioScreenState extends State<InicioScreen> {
           },
         ),
       ),
-      // drawer: Drawer(
-      //   backgroundColor: Colors.white,
-      //   child: Column(
-      //     children: <Widget>[
-      //       UserAccountsDrawerHeader(
-      //         accountName: Text(
-      //           'Leonardo Zamora',
-      //           style: TextStyle(
-      //             color: Colors.black,
-      //             fontWeight: FontWeight.bold,
-      //           ),
-      //         ),
-      //         accountEmail: Text(
-      //           'Administrador',
-      //           style: TextStyle(
-      //             color: Colors.black,
-      //             fontWeight: FontWeight.bold,
-      //             textBaseline: TextBaseline.alphabetic,
-      //           ),
-      //         ),
-      //         currentAccountPicture: const CircleAvatar(
-      //           backgroundColor: Colors.indigo,
-      //           child: Icon(
-      //             Icons.person_outlined,
-      //             size: 50,
-      //             color: Colors.white,
-      //           ),
-      //         ),
-      //         decoration: BoxDecoration(color: Colors.white),
-      //       ),
-      //       Expanded(
-      //         child: ListView(
-      //           padding: EdgeInsets.zero,
-      //           children: [
-      //             ...itemsViewList.asMap().entries.map((entry) {
-      //               final index = entry.key;
-      //               final item = entry.value;
-      //               return ListTile(
-      //                 leading: Icon(item.icon, color: Colors.indigo),
-      //                 title: Text(
-      //                   item.title,
-      //                   style: const TextStyle(
-      //                     color: Colors.black,
-      //                     fontWeight: FontWeight.bold,
-      //                   ),
-      //                 ),
-      //                 dense: true,
-      //                 selectedTileColor: Colors.indigo[50],
-      //                 onTap: () {
-      //                   _onSelected(index);
-      //                 },
-      //               );
-      //             }).toList(),
-      //           ],
-      //         ),
-      //       ),
-      //       const Divider(),
-      //       ListTile(
-      //         leading: const Icon(Icons.logout, color: Colors.redAccent),
-      //         title: const Text('Cerrar Sesión'),
-      //         onTap: () => logout(),
-      //       ),
-      //     ],
-      //   ),
-      // ),
-      // // floatingActionButton: SpeedDial(
-      // //   icon: Icons.more_vert,
-      // //   activeIcon: Icons.close,
-      // //   backgroundColor: Colors.indigo,
-      // //   foregroundColor: Colors.white,
-      // //   tooltip: 'Opciones',
-      // //   buttonSize: const Size(50, 50),
-      // //   spaceBetweenChildren: 12,
-      // //   visible: true,
-      // //   closeManually: false,
-      // //   curve: Curves.bounceIn,
-      // //   overlayColor: Colors.black,
-      // //   overlayOpacity: 0,
-      // //   elevation: 8.0,
-      // //   children: [
-      // //     SpeedDialChild(
-      // //       child: Icon(Icons.sync),
-      // //       label: 'Sincronizar Ventas',
-      // //       foregroundColor: Colors.white,
-      // //       backgroundColor: Colors.green,
-      // //       onTap: () => print('Imprimir'),
-      // //     ),
-      // //   ],
-      // // ),
       floatingActionButtonLocation: _fabLocation,
       floatingActionButton: FloatingActionButton(
         onPressed: () {
@@ -369,8 +280,8 @@ class UserBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String nombreUsuario = 'Leonardo Zamora';
-    final String rolUsuario = 'Vendedor';
+    final String nombreUsuario = 'POSVentas';
+    final String rolUsuario = 'Operador POS';
 
     return Padding(
       padding: const EdgeInsets.all(16.0),
