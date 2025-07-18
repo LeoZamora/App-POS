@@ -48,6 +48,9 @@ class _RegistroVentasState extends State<RegistroVentas> {
 
   Future<void> loadProductos(String tipo) async {
     try {
+      setState(() {
+        _productos = [];
+      });
       final productos = await getProductos(tipo);
 
       setState(() {
@@ -70,9 +73,24 @@ class _RegistroVentasState extends State<RegistroVentas> {
     });
   }
 
+  bool verifyData() {
+    if(noVentaController.text.isEmpty ||
+        clienteController.text.isEmpty ||
+        enviarAController.text.isEmpty ||
+        observacionesController.text.isEmpty ||
+        detalleVenta.isEmpty
+    ) {
+      return false;
+    }
+    return true;
+  }
+
   Future<void> getProductosLocal(String tipoProducto) async {
     final dbHelper = db.DbHelper();
     try {
+      setState(() {
+        _productosLocales = [];
+      });
       final productosLocal = await dbHelper.getProductos(tipoProducto);
 
       setState(() {
@@ -130,6 +148,7 @@ class _RegistroVentasState extends State<RegistroVentas> {
   }
 
   Future<void> _imprimirFactura() async {
+    print('PRODUCTOS: ${detalleVenta.toList().toString()}');
     final printerService = context.read<PrinterService>();
     if(printerService.isPrinting || printerService.isPrinting) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -160,26 +179,29 @@ class _RegistroVentasState extends State<RegistroVentas> {
       setState(() {
         productosConnected.clear();
 
-        detalleVenta.forEach((item) {
-          productosConnected.add({
-            "idVenta": noVentaController.text,
-            "idProducto": item['idProducto'],
-            "cantidad": item['cantidad'],
-            "precioUnitario": item['precioUnitario'],
-            "observaciones": "Sin detalles"
-          });
-        });
+        for (var item in detalleVenta) {
+          if (item['idProducto'] != null && item['nombre'] != null) {
+            productosConnected.add({
+              "idVenta": 0,
+              "idProducto": item['idProducto'],
+              "cantidad": item['cantidad'],
+              "precioUnitario": item['precioUnitario'],
+              "observaciones": "Sin detalles"
+            });
+          }
+        }
 
         productos.clear();
 
-        detalleVenta.forEach((item) {
-          final selectedProducto = _productos.firstWhere((prod) => prod.idProducto == item['idProducto']);
-          productos.add({
-            "nombre": selectedProducto.nombre,
-            "cantidad": item['cantidad'],
-            "precioUnitario": item['precioUnitario'],
-          });
-        });
+        for (var item in detalleVenta) {
+          if (item['idProducto'] != null && item['nombre'] != null) {
+            productos.add({
+              "nombre": item['nombre'],
+              "cantidad": item['cantidad'],
+              "precioUnitario": item['precioUnitario'],
+            });
+          }
+        }
       });
 
       if(productos.isEmpty) {
@@ -200,7 +222,7 @@ class _RegistroVentasState extends State<RegistroVentas> {
       };
 
       final result = await postVentas({
-        "noVenta": noVentaController.text,
+        "noVenta": noVentaController.text.toString(),
         "idCliente": _clienteSeleccionado?.idCliente,
         "credito": _esCredito,
         "observaciones": observacionesController.text,
@@ -208,11 +230,6 @@ class _RegistroVentasState extends State<RegistroVentas> {
         "usuarioRegistro": 'admin',
         "detalleVenta": productosConnected
       });
-
-      print('''
-        Resultado de la petición:
-        $result
-      ''');
 
       if(result?['code'] == 201 ) {
         final nuevaVenta = VentaModel(
@@ -268,15 +285,15 @@ class _RegistroVentasState extends State<RegistroVentas> {
       setState(() {
         productos.clear();
 
-        print(_productosLocales.toList().toString());
-        detalleVenta.forEach((item) {
-          final selectedProducto = _productosLocales.firstWhere((prod) => prod.idProducto == item['idProducto']);
+        for (var item in detalleVenta) {
+          if (item['idProducto'] != null && item['nombre'] != null) {
             productos.add({
-              "nombre": selectedProducto.nombre,
+              "nombre": item['nombre'],
               "cantidad": item['cantidad'],
               "precioUnitario": item['precioUnitario'],
             });
-        });
+          }
+        }
       });
 
       venta = {
@@ -359,17 +376,17 @@ class _RegistroVentasState extends State<RegistroVentas> {
   void agregarProducto() {
     setState(() {
       detalleVenta.add({
+        'tipoProducto': '',
         'idProducto': 0,
         'nombre': '',
-        'tipoProducto': '',
-        'cantidad': 1,
         'precioUnitario': 0.0,
+        'cantidad': 1,
         'total': 0.0,
+        'productosFiltrados': [],
       });
     });
     actualizarTotal();
   }
-
   void eliminarProducto(int index) {
     setState(() {
       detalleVenta.removeAt(index);
@@ -540,15 +557,31 @@ class _RegistroVentasState extends State<RegistroVentas> {
                                 decoration: InputDecoration(labelText: 'Selecciona un tipo de producto'),
                                 isDense: true,
                                 isExpanded: true,
+                                // value: producto['tipoProducto'].toString(),
                                 value: tipo,
                                 hint: const Text("Tipo de producto"),
-                                onChanged: (String? value) {
-                                  print('VALUEEEEEEEEEEEEEEEEEEEEEE $value');
+                                onChanged: (String? value) async {
                                   setState(() {
-                                    tipo = value.toString();
-                                    _selectedProductId = null;
-                                    getProductosLocal(value.toString());
-                                    loadProductos(value.toString());
+                                    producto['tipoProducto'] = value!;
+                                    producto['idProducto'] = 0;
+                                    producto['nombre'] = '';
+                                    producto['precioUnitario'] = 0.0;
+                                    producto['total'] = 0.0;
+                                    producto['productosFiltrados'] = [];
+                                  });
+
+                                  // Cargar productos del tipo seleccionado
+                                  List<ProductoModel> productosFiltrados;
+                                  if (isConnected) {
+                                    productosFiltrados = await getProductos(value.toString());
+                                  } else {
+                                    final dbHelper = db.DbHelper();
+                                    final local = await dbHelper.getProductos(value.toString());
+                                    productosFiltrados = local;
+                                  }
+
+                                  setState(() {
+                                    producto['productosFiltrados'] = productosFiltrados;
                                   });
                                 },
                                 validator: (value) => value == null ? 'Seleccione un tipo de producto' : value,
@@ -561,40 +594,31 @@ class _RegistroVentasState extends State<RegistroVentas> {
                               ),
                               const SizedBox(height: 10),
                               DropdownButtonFormField<String>(
-                                isDense: true,
-                                isExpanded: true,
-                                value: _selectedProductId,
+                                value: producto['idProducto'] == 0 ? null : producto['idProducto'].toString(),
                                 hint: const Text("Producto"),
+                                isExpanded: true,
                                 onChanged: (value) {
                                   setState(() {
-                                    _selectedProductId = value;
-                                    if(isConnected) {
-                                      if(value != null) {
-                                        final selectedProducto = uniqueProductos.firstWhere((prod) => prod.idProducto.toString() == value);
-                                        detalleVenta[index]['nombre'] = selectedProducto.nombre;
-                                        detalleVenta[index]['idProducto'] = selectedProducto.idProducto;
-                                        detalleVenta[index]['tipoProducto'] = selectedProducto.tipoProducto;
-                                        detalleVenta[index]['precioUnitario'] = selectedProducto.precio;
-                                        detalleVenta[index]['total'] = selectedProducto.precio;
-                                      }
-                                    } else {
-                                      if(value != null) {
-                                        final selectedProducto = uniqueProductos.firstWhere((prod) => prod.idProducto.toString() == value);
-                                        detalleVenta[index]['nombre'] = selectedProducto.nombre;
-                                        detalleVenta[index]['idProducto'] = selectedProducto.idProducto;
-                                        detalleVenta[index]['tipoProducto'] = selectedProducto.tipoProducto;
-                                        detalleVenta[index]['precioUnitario'] = selectedProducto.precio;
-                                        detalleVenta[index]['total'] = selectedProducto.precio;
-                                      }
-                                    }
+                                    print('PRODUCTOOOOOO $value');
+                                    final p = producto['productosFiltrados'][1];
+                                    print('${p.nombre}, $value');
+                                    final selected = producto['productosFiltrados'].firstWhere(
+                                          (p) => p.idProducto.toString() == value.toString()
+                                    );
 
+                                    if (selected != null) {
+                                      producto['idProducto'] = selected.idProducto;
+                                      producto['nombre'] = selected.nombre;
+                                      producto['precioUnitario'] = selected.precio;
+                                      producto['total'] = selected.precio * producto['cantidad'];
+                                    }
                                   });
                                 },
-                                validator: (value) => value == null ? 'Seleccione un producto' : value,
-                                items: uniqueProductos.map((prod) {
+                                items: (producto['productosFiltrados'] as List)
+                                    .map<DropdownMenuItem<String>>((prod) {
                                   return DropdownMenuItem<String>(
                                     value: prod.idProducto.toString(),
-                                    child: Text(prod.nombre.toString()),
+                                    child: Text(prod.nombre),
                                   );
                                 }).toList(),
                               ),
