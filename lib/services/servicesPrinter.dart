@@ -88,7 +88,7 @@ class PrinterService with ChangeNotifier {
 
     buffer.writeln('');
     buffer.writeln('| !Gracias por su preferencia! |');
-    buffer.writeln('|      www.minegocio.com       |');
+    // buffer.writeln('|      www.minegocio.com       |');
     buffer.writeln('');
 
     return buffer.toString();
