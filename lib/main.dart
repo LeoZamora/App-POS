@@ -27,14 +27,14 @@ Future<void> borrarBaseDeDatos() async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final List<TipoProductoModel> tiposProductos = [
-    TipoProductoModel(nombre: 'MATERIA PRIMA'),
-    TipoProductoModel(nombre: 'Producto Terminado'),
+    TipoProductoModel(nombre: 'Herramientas'),
+    // TipoProductoModel(nombre: 'Producto Terminado'),
   ];
 
   final db = DbHelper();
 
+  await borrarBaseDeDatos();
   await db.insertTipoProducto(tiposProductos);
-  // await borrarBaseDeDatos();
 
   runApp(
     MultiProvider(

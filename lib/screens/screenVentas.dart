@@ -36,6 +36,7 @@ class _VentasScreenState extends State<VentasScreen> {
           "sincronizada": venta.sincronizada,
           "fechaRegistro": venta.fechaRegistro,
           "usuarioRegistro": venta.usuarioRegistro,
+          "total": venta.total,
           "estado": venta.estado,
         })).toList();
       });
@@ -86,84 +87,76 @@ class _VentasScreenState extends State<VentasScreen> {
       body: Column(
         children: [
           Expanded(
-            child: FutureBuilder(
-              future: _ventas,
-              builder: (context, snapshot) {
-                if(snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator(
-                    color: Colors.indigo,
-                  ));
-                } else if(snapshot.hasError) {
-                  return Text('No se encontraron datos');
-                } else if(snapshot.hasData && snapshot.data!.isEmpty) {
-                  return Text('No hay ventas registradas');
-                }
+            child: _ventasLocales.isEmpty
+                ? const Center(child: CircularProgressIndicator(color: Colors.indigo))
+                : ListView.builder(
+              padding: const EdgeInsets.all(8),
+              itemCount: _ventasLocales.length,
+              itemBuilder: (context, i) {
+                final venta = _ventasLocales[i];
 
-                final ventas = snapshot.data!;
-
-                return ListView.builder(
-                  padding: const EdgeInsets.all(8),
-                  itemCount: ventas.length,
-                  itemBuilder: (context, i) {
-                    final venta = ventas[i];
-
-                    return Card(
-                      elevation: 6,
-                      color: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                return Card(
+                  elevation: 6,
+                  color: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.receipt_long_outlined, color: Colors.indigo),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Venta: #${venta.noVenta}',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                ),
-                                const Spacer(),
-                                IconButton(
-                                    onPressed: () => {},
-                                    icon: Icon(
-                                      Icons.visibility_outlined,
-                                      color: Colors.amber.withAlpha(250),
-                                    )
-                                )
-                              ],
-                            ),
-                            // const SizedBox(width: 6,),
-                            Row(
-                              children: [
-                                const Icon(Icons.person_outline, color: Colors.indigo),
-                                const SizedBox(width: 8,),
-                                Text('Cliente: ${venta.idCliente}')
-                              ],
-                            ),
-                            const SizedBox(width: 6,),
-                            Row(
-                              children: [
-                                const Icon(Icons.date_range_outlined, color: Colors.indigo),
-                                const SizedBox(width: 8,),
-                                Text('Fecha: ${helpers.formatedDate(venta.fechaRegistro)}')
-                                // Text('Fecha: ${venta.fechaRegistro}')
-                              ],
-                            ),
-                            const SizedBox(height: 12),
+                            const Icon(Icons.receipt_long_outlined, color: Colors.indigo),
+                            const SizedBox(width: 8),
                             Text(
-                              venta.observaciones ?? '',
-                              style: const TextStyle(color: Colors.black54),
+                              'Venta: #${venta.noVenta}',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                             ),
-                          ]
-                        )
-                      )
-                    );
-                  },
+                            const Spacer(),
+                            // IconButton(
+                            //     onPressed: () async {
+                            //       // Aquí podrías agregar una vista de detalles
+                            //     },
+                            //     icon: Icon(
+                            //       Icons.visibility_outlined,
+                            //       color: Colors.amber.withAlpha(250),
+                            //     )
+                            // )
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            const Icon(Icons.person_outline, color: Colors.indigo),
+                            const SizedBox(width: 8,),
+                            Text('Cliente: ${venta.cliente ?? venta.idCliente}')
+                          ],
+                        ),
+                        const SizedBox(width: 6,),
+                        Row(
+                          children: [
+                            const Icon(Icons.date_range_outlined, color: Colors.indigo),
+                            const SizedBox(width: 8,),
+                            Text('Fecha: ${helpers.formatedDate(venta.fechaRegistro)}')
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            const Icon(Icons.monetization_on_outlined, color: Colors.indigo),
+                            const SizedBox(width: 8,),
+                            Text('Cliente: C\$${venta.total}')
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          venta.observaciones ?? '',
+                          style: const TextStyle(color: Colors.black54),
+                        ),
+                      ],
+                    ),
+                  ),
                 );
-              }
-            )
+              },
+            ),
           ),
         ],
       )

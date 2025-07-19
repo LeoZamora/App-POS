@@ -209,10 +209,12 @@ class DbHelper {
   Future<List<DetalleVentaModel>> getDetalleVentas(int idVenta) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
-        'DetalleVentas',
+        'DetalleVenta',
       where: 'idVenta = ?',
       whereArgs: [idVenta]
     );
+
+    print('Detalles: ${maps.toList().toString()}');
 
     return maps.map((map) => DetalleVentaModel.fromMap(map)).toList();
   }
@@ -243,6 +245,13 @@ class DbHelper {
           'observaciones': detalle.observaciones,
           'estado': 1
         });
+
+        await txn.update(
+          'Producto',
+          {'cantidadTotal': detalle.cantidad},
+          where: 'idProducto = ?',
+          whereArgs: [detalle.idProducto],
+        );
       }
     });
   }
@@ -306,15 +315,50 @@ class DbHelper {
   }
 
   Future<bool> sincronizarProductosDesdeAPI(String tipoProducto) async {
+    final db = await DbHelper().database;
     try {
       List<VentaModel> _ventas = await getVentas();
-      final List<ProductoModel> productosAPI = await requests.getProductos(tipoProducto);
-      final List<ClienteModel> clientesAPI = await requests.getClientes();
+      List<Map<String, dynamic>> detalles = [];
 
+      for(var venta in _ventas) {
+        if(venta.sincronizada == false) {
+          List<DetalleVentaModel> _detalles = await getDetalleVentas(venta.idVenta!);
 
-      print(productosAPI.toString());
-      final db = await DbHelper().database;
+          for(var detalle in _detalles) {
+            Map<String, dynamic> detalleDet = {
+              "idVenta": detalle.idVenta,
+              "idProducto": detalle.idProducto,
+              "cantidad": detalle.cantidad,
+              "precioUnitario": detalle.precioUnitario,
+              "observaciones": detalle.observaciones,
+            };
+            detalles.add(detalleDet);
+          }
 
+          Map<String, dynamic> ventaDet = {
+            "noVenta": venta.noVenta,
+            "idCliente": venta.idCliente,
+            "credito": venta.credito,
+            "observaciones": venta.observaciones,
+            "enviarA": venta.enviarA,
+            "sincronizada": venta.sincronizada,
+            "usuarioRegistro": venta.usuarioRegistro,
+            "detalleVenta": detalles,
+          };
+
+          await requests.postVentas(ventaDet);
+          print('Ventas Sincronizadas');
+
+          await db.update(
+            'Venta',
+            {'sincronizada': 1},
+            where: 'idVenta = ?',
+            whereArgs: [venta.idVenta],
+          );
+        }
+      }
+
+    final List<ClienteModel> clientesAPI = await requests.getClientes();
       for(var cliente in clientesAPI) {
         final List<Map<String, dynamic>> existentes = await db.query(
           'Cliente',
@@ -341,6 +385,7 @@ class DbHelper {
         }
       }
 
+      final List<ProductoModel> productosAPI = await requests.getProductos(tipoProducto);
       for (final producto in productosAPI) {
         final List<Map<String, dynamic>> existentes = await db.query(
           'Producto',

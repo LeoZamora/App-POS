@@ -32,6 +32,7 @@ class _RegistroVentasState extends State<RegistroVentas> {
   String cliente = '';
   String? tipo;
   String? _selectedProductId;
+  bool isStock = false;
 
   late Future<List<ClienteModel>> _clientes;
   late Future<List<ClienteModel>> _clientesLocalFuture;
@@ -45,6 +46,7 @@ class _RegistroVentasState extends State<RegistroVentas> {
   final TextEditingController clienteController = TextEditingController();
   final TextEditingController usuarioController = TextEditingController();
   final TextEditingController noVentaController = TextEditingController();
+  final Map<int, TextEditingController> _precioControllers = {};
 
   Future<void> loadProductos(String tipo) async {
     try {
@@ -227,7 +229,7 @@ class _RegistroVentasState extends State<RegistroVentas> {
         "credito": _esCredito,
         "observaciones": observacionesController.text,
         "enviarA": enviarAController.text,
-        "usuarioRegistro": 'admin',
+        "usuarioRegistro": 'POSVentas',
         "detalleVenta": productosConnected
       });
 
@@ -241,7 +243,7 @@ class _RegistroVentasState extends State<RegistroVentas> {
             observaciones: observacionesController.text,
             enviarA: enviarAController.text,
             fechaRegistro: new DateTime.now().toString(),
-            usuarioRegistro: 'admin',
+            usuarioRegistro: 'POSVentas',
             total: totalVenta
         );
 
@@ -299,7 +301,6 @@ class _RegistroVentasState extends State<RegistroVentas> {
       venta = {
         "noVenta": noVentaController.text,
         "idCliente": _clienteSeleccionado?.codigo,
-        // "idCliente": clienteController.text,
         "enviarA": enviarAController.text,
         "fechaRegistro": new DateTime.now().toString(),
         "observaciones": observacionesController.text,
@@ -322,7 +323,7 @@ class _RegistroVentasState extends State<RegistroVentas> {
           observaciones: observacionesController.text,
           enviarA: enviarAController.text,
           fechaRegistro: new DateTime.now().toString(),
-          usuarioRegistro: 'admin',
+          usuarioRegistro: 'POSVentas',
           total: totalVenta
         );
 
@@ -545,6 +546,17 @@ class _RegistroVentasState extends State<RegistroVentas> {
                       final uniqueProductos = productos.toSet().toList();
                       final uniqueTiposProductos = _tiposProductos.toSet().toList();
 
+                      // Inicializa el controlador si no existe
+                      if (!_precioControllers.containsKey(index)) {
+                        _precioControllers[index] = TextEditingController(
+                          text: producto['precioUnitario'].toString(),
+                        );
+                      } else {
+                        // Actualiza el valor del controlador si el precio cambió
+                        _precioControllers[index]!.text = producto['precioUnitario'].toString();
+                      }
+
+
                       return Card(
                         color: Colors.white,
                         elevation: 4.0,
@@ -557,7 +569,6 @@ class _RegistroVentasState extends State<RegistroVentas> {
                                 decoration: InputDecoration(labelText: 'Selecciona un tipo de producto'),
                                 isDense: true,
                                 isExpanded: true,
-                                // value: producto['tipoProducto'].toString(),
                                 value: tipo,
                                 hint: const Text("Tipo de producto"),
                                 onChanged: (String? value) async {
@@ -599,18 +610,25 @@ class _RegistroVentasState extends State<RegistroVentas> {
                                 isExpanded: true,
                                 onChanged: (value) {
                                   setState(() {
-                                    print('PRODUCTOOOOOO $value');
-                                    final p = producto['productosFiltrados'][1];
-                                    print('${p.nombre}, $value');
+                                    isStock = false;
                                     final selected = producto['productosFiltrados'].firstWhere(
                                           (p) => p.idProducto.toString() == value.toString()
                                     );
+                                    if(selected.cantidadTotal <= 0 || selected.cantidadTotal == null) {
+                                      isStock = true;
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('No hay stock disponible'))
+                                      );
+                                      detalleVenta.removeAt(index);
+                                      return;
+                                    }
 
                                     if (selected != null) {
                                       producto['idProducto'] = selected.idProducto;
                                       producto['nombre'] = selected.nombre;
                                       producto['precioUnitario'] = selected.precio;
-                                      producto['total'] = selected.precio * producto['cantidad'];
+                                      producto['total'] = 0;
+                                      calcularTotalItem(index);
                                     }
                                   });
                                 },
@@ -629,26 +647,33 @@ class _RegistroVentasState extends State<RegistroVentas> {
                                     child: TextFormField(
                                       initialValue: producto['cantidad'].toString(),
                                       keyboardType: TextInputType.number,
+                                      readOnly: isStock ? true : false,
                                       decoration: const InputDecoration(labelText: 'Cantidad'),
                                       onChanged: (value) {
-                                        detalleVenta[index]['cantidad'] = double.tryParse(value) ?? 1;
-                                        calcularTotalItem(index);
+                                        setState(() {
+                                          producto['total'] = 0;
+                                          producto['cantidad'] = double.tryParse(value) ?? 1;
+                                          producto['total'] = producto['precioUnitario'] * producto['cantidad'];
+                                          calcularTotalItem(index);
+                                        });
                                       },
                                     ),
                                   ),
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: TextFormField(
-                                      initialValue: producto['precioUnitario'].toString(),
+                                      controller: _precioControllers[index],
                                       keyboardType: TextInputType.number,
+                                      readOnly: isStock ? true : false,
                                       decoration: const InputDecoration(labelText: 'Precio U'),
                                       onChanged: (value) {
                                         print('Precio del producto $value');
                                         final precio = double.tryParse(value);
                                         if (precio != null) {
-                                          detalleVenta[index]['precioUnitario'] = precio;
-                                          print(detalleVenta[index]);
-                                          calcularTotalItem(index);
+                                          setState(() {
+                                            producto['precioUnitario'] = precio;
+                                            calcularTotalItem(index);
+                                          });
                                         } else {
                                           print("Precio inválido: '$value'");
                                         }

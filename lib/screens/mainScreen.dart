@@ -36,14 +36,9 @@ class _InicioScreenState extends State<InicioScreen> {
   }];
 
    syncData () async {
-    bool sync = await db.DbHelper().sincronizarProductosDesdeAPI('MATERIA PRIMA');
-    bool sync2 = await db.DbHelper().sincronizarProductosDesdeAPI('Producto Terminado');
-
-    if(sync && sync2) {
-      print('Sincronización exitosa');
-    } else {
-      print('Error en la sincronización');
-    }
+     print('Sincronizando datos...');
+     await db.DbHelper().sincronizarProductosDesdeAPI('MATERIA PRIMA');
+     await db.DbHelper().sincronizarProductosDesdeAPI('Producto Terminado');
   }
 
   void logout() {
@@ -75,7 +70,7 @@ class _InicioScreenState extends State<InicioScreen> {
         });
 
         if(status == InternetConnectionStatus.connected) {
-          await syncData();
+          // await syncData();
         }
       }
     });
@@ -186,32 +181,39 @@ class _InicioScreenState extends State<InicioScreen> {
         shape: CircleBorder(),
       ),
       bottomNavigationBar: SizedBox(
-        height: 50.0,
+        height: 60.0,
         width: double.infinity,
-        child: _DemoBottomAppBar(
+        child: DemoBottomAppBar(
           fabLocation: _fabLocation,
           shape: const CircularNotchedRectangle(),
           isConnected: isConnected,
           onPressedLogout: logout,
+          syncData: () async {
+            print('Sincronizando datos...');
+            await db.DbHelper().sincronizarProductosDesdeAPI('Herramientas');
+            // await db.DbHelper().sincronizarProductosDesdeAPI('Producto Terminado');
+          },
         ),
       ),
     );
   }
 }
 
-class _DemoBottomAppBar extends StatelessWidget {
+class DemoBottomAppBar extends StatefulWidget {
   final VoidCallback onPressedLogout;
+  final Future<void> Function() syncData;
   final FloatingActionButtonLocation fabLocation;
   final NotchedShape? shape;
   final bool isConnected;
-  final printerService = PrinterService();
 
-  _DemoBottomAppBar({
+  const DemoBottomAppBar({
     this.fabLocation = FloatingActionButtonLocation.endDocked,
     this.shape = const CircularNotchedRectangle(),
     this.isConnected = false,
     required this.onPressedLogout,
-  });
+    required this.syncData,
+    Key? key,
+  }) : super(key: key);
 
   static final List<FloatingActionButtonLocation> centerLocations = <FloatingActionButtonLocation>[
     FloatingActionButtonLocation.centerDocked,
@@ -219,9 +221,44 @@ class _DemoBottomAppBar extends StatelessWidget {
   ];
 
   @override
+  _DemoBottomAppBarState createState() => _DemoBottomAppBarState();
+}
+
+class _DemoBottomAppBarState extends State<DemoBottomAppBar> {
+  final printerService = PrinterService();
+  bool sync = false;
+
+  Future<void> _handleSync() async {
+    if (widget.syncData == null) return;
+    setState(() {
+      sync = true;
+    });
+
+    try {
+      // await Future.delayed(const Duration(seconds: 3));
+      await widget.syncData();
+      print('Sincronizando2...');
+    } finally {
+      if (mounted) {
+        setState(() {
+          sync = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if(widget.isConnected) {
+      _handleSync();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return BottomAppBar(
-      shape: shape,
+      shape: widget.shape,
       color: Colors.indigo,
       child: IconTheme(
         data: IconThemeData(color: Theme.of(context).colorScheme.onPrimary),
@@ -230,11 +267,16 @@ class _DemoBottomAppBar extends StatelessWidget {
           children: <Widget>[
             Row(
               children: <Widget>[
-                IconButton(
-                  onPressed: () => {},
+                sync ? Padding(
+                  padding: const EdgeInsets.all(1.0),
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )  : IconButton(
+                  onPressed: _handleSync,
                   icon: Icon(
                     Icons.sync,
-                    color: isConnected ? Colors.green : Colors.white,
+                    color: widget.isConnected ? Colors.green : Colors.white,
                   ),
                   tooltip: "Sincronizar Ventas",
                 ),
@@ -256,10 +298,14 @@ class _DemoBottomAppBar extends StatelessWidget {
                   onPressed: () {
                     showModalBottomSheet(
                       context: context,
-                      shape: const RoundedRectangleBorder(
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                      ),
-                      builder: (context) => UserBottomSheet(onPressed: onPressedLogout,),
+                      shape: RoundedRectangleBorder(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                    ),
+                      builder: (context) {
+                        return UserBottomSheet(
+                          onPressed: widget.onPressedLogout,
+                        );
+                      }
                     );
                   },
                   icon: Icon(Icons.person_outline, color: Colors.white),
