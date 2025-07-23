@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:inversiones_ar/dbModels/dbModels.dart';
 import 'package:inversiones_ar/requestHttp/requestHttp.dart';
@@ -8,6 +6,8 @@ import 'package:provider/provider.dart';
 import 'package:inversiones_ar/dbHelper/dbHelper.dart' as db;
 import 'package:internet_connection_checker/internet_connection_checker.dart';
 import 'dart:async';
+import 'package:geolocator/geolocator.dart';
+import 'package:inversiones_ar/services/geolocationServices.dart';
 
 class RegistroVentas extends StatefulWidget {
   const RegistroVentas({super.key});
@@ -150,8 +150,8 @@ class _RegistroVentasState extends State<RegistroVentas> {
   }
 
   Future<void> _imprimirFactura() async {
-    print('PRODUCTOS: ${detalleVenta.toList().toString()}');
     final printerService = context.read<PrinterService>();
+    late String location;
     if(printerService.isPrinting || printerService.isPrinting) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Ya se está imprimiendo una factura.'))
@@ -178,7 +178,10 @@ class _RegistroVentasState extends State<RegistroVentas> {
 
     if(isConnected) {
       print('CONECTADO');
+      Position position = await getCurrentLocation();
+      String localidad = await getLocalidad(position);
       setState(() {
+        location = localidad;
         productosConnected.clear();
 
         for (var item in detalleVenta) {
@@ -218,6 +221,7 @@ class _RegistroVentasState extends State<RegistroVentas> {
         // "idCliente": clienteController.text,
         "enviarA": enviarAController.text,
         "fechaRegistro": new DateTime.now().toString(),
+        "ubicacion": location,
         "observaciones": observacionesController.text,
         "credito": _esCredito,
         "usuarioRegistro": productosConnected
@@ -228,17 +232,19 @@ class _RegistroVentasState extends State<RegistroVentas> {
         "idCliente": _clienteSeleccionado?.idCliente,
         "credito": _esCredito,
         "observaciones": observacionesController.text,
+        "ubicacion": location,
         "enviarA": enviarAController.text,
         "usuarioRegistro": 'POSVentas',
         "detalleVenta": productosConnected
       });
 
-      if(result?['code'] == 201 ) {
+      if(result?['code'] != 400 || result?['code'] != 404 ) {
         final nuevaVenta = VentaModel(
             noVenta: noVentaController.text,
             idCliente: _clienteSeleccionado?.idCliente ?? 0,
             credito: _esCredito,
             cliente: _clienteSeleccionado?.codigo ?? '',
+            ubicacion: location,
             sincronizada: true,
             observaciones: observacionesController.text,
             enviarA: enviarAController.text,
@@ -262,7 +268,7 @@ class _RegistroVentasState extends State<RegistroVentas> {
           );
         }).toList();
 
-        await db.DbHelper().registrarVenta( nuevaVenta,  detalle);
+        await db.DbHelper().registrarVenta(nuevaVenta,  detalle);
         final bool success = await printerService.imprimirFactura(
           context: context,
           venta: venta,
@@ -284,8 +290,11 @@ class _RegistroVentasState extends State<RegistroVentas> {
       }
     } else {
       print('DESCONECTADO');
+      final Map<String, dynamic> ubicacion = await db.DbHelper().getUbicacion();
+      print('Ubicacion: ${ubicacion.toString()}');
       setState(() {
         productos.clear();
+        location = ubicacion['nombre'];
 
         for (var item in detalleVenta) {
           if (item['idProducto'] != null && item['nombre'] != null) {
@@ -320,6 +329,7 @@ class _RegistroVentasState extends State<RegistroVentas> {
           credito: _esCredito,
           cliente: _clienteSeleccionado?.codigo ?? '',
           sincronizada: false,
+          ubicacion: location,
           observaciones: observacionesController.text,
           enviarA: enviarAController.text,
           fechaRegistro: new DateTime.now().toString(),
@@ -344,7 +354,8 @@ class _RegistroVentasState extends State<RegistroVentas> {
           );
         }).toList();
 
-        await db.DbHelper().registrarVenta( nuevaVenta,  detalle);
+        print('NUEVA VENTA: ${nuevaVenta.ubicacion.toString()}');
+        await db.DbHelper().registrarVenta(nuevaVenta,  detalle);
         final bool success = await printerService.imprimirFactura(
           context: context,
           venta: venta,
@@ -388,6 +399,7 @@ class _RegistroVentasState extends State<RegistroVentas> {
     });
     actualizarTotal();
   }
+
   void eliminarProducto(int index) {
     setState(() {
       detalleVenta.removeAt(index);
@@ -404,7 +416,6 @@ class _RegistroVentasState extends State<RegistroVentas> {
     });
     actualizarTotal();
   }
-
 
   @override
   void initState() {
@@ -471,8 +482,8 @@ class _RegistroVentasState extends State<RegistroVentas> {
                             keyboardType: TextInputType.number,
                             controller: noVentaController,
                             decoration: const InputDecoration(
-                                labelText: 'No. Venta',
-                                isDense: true
+                              labelText: 'No. Venta',
+                              isDense: true
                             )
                           ),
                         )

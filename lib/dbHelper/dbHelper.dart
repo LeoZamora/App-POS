@@ -28,6 +28,14 @@ class DbHelper {
       version: 1,
       onCreate: (db, version) async {
         await db.execute('''
+          CREATE TABLE Ubicacion (
+            idUbicacion INTEGER PRIMARY KEY,
+            nombre TEXT NOT NULL,
+            fechaRegistro TEXT NOT NULL
+          )
+        ''');
+
+        await db.execute('''        
        CREATE TABLE CategoriaProducto(
           dCategoriaProducto INTEGER PRIMARY KEY AUTOINCREMENT,
           nombre TEXT NOT NULL,
@@ -35,6 +43,7 @@ class DbHelper {
           usuarioRegistro TEXT NOT NULL,
           estado INTEGER NOT NULL
        )''');
+
         await db.execute('''
         CREATE TABLE SubCategoriaProd (
           idSubCatProd INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -158,6 +167,7 @@ class DbHelper {
           credito INTEGER NOT NULL,
           observaciones TEXT,
           enviarA TEXT,
+          ubicacion TEXT,
           sincronizada INTEGER NOT NULL,
           fechaRegistro TEXT NOT NULL,
           usuarioRegistro TEXT NOT NULL,
@@ -187,6 +197,8 @@ class DbHelper {
           nombre TEXT NOT NULL
         )
         ''');
+
+        await db.insert('TipoProducto', {'nombre': 'Herramientas'});
       },
     );
   }
@@ -230,6 +242,7 @@ class DbHelper {
         'observaciones': venta.observaciones,
         'sincronizada': venta.sincronizada == true ? 1 : 0,
         'enviarA': venta.enviarA,
+        'ubicacion': venta.ubicacion,
         'fechaRegistro': venta.fechaRegistro,
         'usuarioRegistro': venta.usuarioRegistro,
         'estado':  1,
@@ -316,11 +329,13 @@ class DbHelper {
 
   Future<bool> sincronizarProductosDesdeAPI(String tipoProducto) async {
     final db = await DbHelper().database;
+
     try {
       List<VentaModel> _ventas = await getVentas();
       List<Map<String, dynamic>> detalles = [];
 
       for(var venta in _ventas) {
+        print('Venta: ${venta.sincronizada}');
         if(venta.sincronizada == false) {
           List<DetalleVentaModel> _detalles = await getDetalleVentas(venta.idVenta!);
 
@@ -367,15 +382,16 @@ class DbHelper {
         );
 
         final clienteMap = cliente.toMap();
+        print('clienteMap: ${clienteMap.toString()}');
         clienteMap['personaNatural'] = cliente.personaNatural == true ? 1 : 0;
         clienteMap['estado'] = cliente.estado == true ? 1 : 0;
 
         if(existentes.isEmpty) {
-          print('Creados');
+          print('Creados Clientes');
           await db.insert('Cliente', clienteMap);
           print('Creados');
         } else {
-          print('Actualizados');
+          print('Actualizados Clientes');
           await db.update(
             'Cliente',
               clienteMap,
@@ -415,5 +431,11 @@ class DbHelper {
       print("Error al sincronizar productos: $e");
       return false;
     }
+  }
+
+  Future<Map<String, dynamic>> getUbicacion() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('Ubicacion');
+    return maps.first;
   }
 }

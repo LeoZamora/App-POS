@@ -98,9 +98,15 @@ class MainActivity : FlutterActivity() {
                     disconnectDevice(result)
                 }
 
+                "requestLocationServices" -> {
+                    requestLocationPermission()
+                    result.success("Permisos de ubicación solicitados.");
+                }
+
                 else -> {
                     result.notImplemented()
                 }
+
             }
         }
     }
@@ -370,5 +376,26 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }.start()
+    }
+
+    private fun requestLocationPermission() {
+        val LOCATION_PERMISSION_CODE = 2;
+
+        val permissionToRequest = mutableListOf<String>()
+
+        if(ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED) {
+            permissionToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION);
+        }
+
+        if(permissionToRequest.isNotEmpty()) {
+            ActivityCompat.requestPermissions(
+                this,
+                permissionToRequest.toTypedArray(),
+                LOCATION_PERMISSION_CODE
+            );
+        } else {
+            Log.d("MainActivity", "Location permission already granted.")
+        }
     }
 }

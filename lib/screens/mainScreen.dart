@@ -37,8 +37,8 @@ class _InicioScreenState extends State<InicioScreen> {
 
    syncData () async {
      print('Sincronizando datos...');
-     await db.DbHelper().sincronizarProductosDesdeAPI('MATERIA PRIMA');
-     await db.DbHelper().sincronizarProductosDesdeAPI('Producto Terminado');
+     await db.DbHelper().sincronizarProductosDesdeAPI('Herramientas');
+     // await db.DbHelper().sincronizarProductosDesdeAPI('Producto Terminado');
   }
 
   void logout() {

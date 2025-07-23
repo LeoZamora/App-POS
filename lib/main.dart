@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:inversiones_ar/dbModels/dbModels.dart';
 import 'package:inversiones_ar/routesApp/routesApp.dart';
+import 'package:inversiones_ar/services/geolocationServices.dart';
 import 'package:inversiones_ar/services/servicesPrinter.dart';
 import 'package:inversiones_ar/services/stateServices.dart';
 import 'package:provider/provider.dart';
 import 'package:inversiones_ar/dbHelper/dbHelper.dart';
-
 import 'package:sqflite/sqflite.dart';
 import 'dart:io';
+
 
 Future<void> borrarBaseDeDatos() async {
   final dbPath = await getDatabasesPath();
@@ -23,18 +23,14 @@ Future<void> borrarBaseDeDatos() async {
     print('ℹ️ No se encontró el archivo de la base de datos.');
   }
 }
+final locationServices = UbicationService();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final List<TipoProductoModel> tiposProductos = [
-    TipoProductoModel(nombre: 'Herramientas'),
-    // TipoProductoModel(nombre: 'Producto Terminado'),
-  ];
-
+  locationServices.startLocationUpdatesPeriodically();
   final db = DbHelper();
 
-  await borrarBaseDeDatos();
-  await db.insertTipoProducto(tiposProductos);
+  // await borrarBaseDeDatos();
 
   runApp(
     MultiProvider(

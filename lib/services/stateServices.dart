@@ -14,6 +14,4 @@ class StateServices extends ChangeNotifier {
     _isLoading = false;
     notifyListeners();
  }
-
-
 }

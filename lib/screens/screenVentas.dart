@@ -5,6 +5,8 @@ import 'package:inversiones_ar/requestHttp/requestHttp.dart';
 import 'package:inversiones_ar/services/servicesPrinter.dart';
 import 'package:provider/provider.dart';
 import 'package:inversiones_ar/helpers/formatters.dart' as helpers;
+import 'dart:async';
+import 'package:internet_connection_checker/internet_connection_checker.dart';
 
 class VentasScreen extends StatefulWidget {
   const VentasScreen({super.key});
@@ -16,6 +18,9 @@ class VentasScreen extends StatefulWidget {
 class _VentasScreenState extends State<VentasScreen> {
   late Future<List<VentaModel>> _ventas;
   List<VentaModel> _ventasLocales = [];
+  final connectionChecker = InternetConnectionChecker.instance;
+  bool isConnected = false;
+  late StreamSubscription<InternetConnectionStatus> _connectionStatus;
 
   final DbHelper dbHelper = DbHelper();
   bool isLoading = true;
@@ -33,6 +38,7 @@ class _VentasScreenState extends State<VentasScreen> {
           "credito": venta.credito,
           "observaciones": venta.observaciones,
           "enviarA": venta.enviarA,
+          "ubicacion": venta.ubicacion,
           "sincronizada": venta.sincronizada,
           "fechaRegistro": venta.fechaRegistro,
           "usuarioRegistro": venta.usuarioRegistro,
@@ -41,7 +47,7 @@ class _VentasScreenState extends State<VentasScreen> {
         })).toList();
       });
 
-      print('Ventas locales: ${_ventasLocales.toList().toString()}');
+      print('Ventas locales: ${_ventasLocales[1].toString()}');
     } catch (e) {
       print('Error al obtener las ventas locales: $e');
     }
@@ -50,10 +56,36 @@ class _VentasScreenState extends State<VentasScreen> {
   @override
   void initState() {
     super.initState();
-    _ventas = getVentas();
+    // _ventas = getVentas();
     getVentasLocales();
+    connectionChecker.hasConnection.then((value) async {
+      if(mounted) {
+        setState(() {
+          isConnected = value;
+        });
+
+        if(isConnected) {
+          await getVentasLocales();
+        } else {
+          await getVentasLocales();
+        }
+      }
+    });
+
+    _connectionStatus = connectionChecker.onStatusChange.listen((status) async {
+      if(mounted) {
+        setState(() {
+          isConnected = status == InternetConnectionStatus.connected;
+        });
+
+        if(status == InternetConnectionStatus.connected) {
+          // await syncData();
+        }
+      }
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
+      if(mounted) {
         context.read<PrinterService>().requestBluetoothPermissions(context: context);
       }
     });
@@ -87,8 +119,8 @@ class _VentasScreenState extends State<VentasScreen> {
       body: Column(
         children: [
           Expanded(
-            child: _ventasLocales.isEmpty
-                ? const Center(child: CircularProgressIndicator(color: Colors.indigo))
+            child:  _ventasLocales.isEmpty
+                ? const Center(child: Text('NO HAY VENTAS REGISTRADAS', style: TextStyle(fontWeight: FontWeight.bold),))
                 : ListView.builder(
               padding: const EdgeInsets.all(8),
               itemCount: _ventasLocales.length,
@@ -128,7 +160,8 @@ class _VentasScreenState extends State<VentasScreen> {
                           children: [
                             const Icon(Icons.person_outline, color: Colors.indigo),
                             const SizedBox(width: 8,),
-                            Text('Cliente: ${venta.cliente ?? venta.idCliente}')
+                            Text('Cliente: ', style: TextStyle(fontWeight: FontWeight.bold),),
+                            Text('${venta.cliente ?? venta.cliente}')
                           ],
                         ),
                         const SizedBox(width: 6,),
@@ -136,14 +169,38 @@ class _VentasScreenState extends State<VentasScreen> {
                           children: [
                             const Icon(Icons.date_range_outlined, color: Colors.indigo),
                             const SizedBox(width: 8,),
-                            Text('Fecha: ${helpers.formatedDate(venta.fechaRegistro)}')
+                            Text('Fecha: ', style: TextStyle(fontWeight: FontWeight.bold),),
+                            Text('${helpers.formatedDate(venta.fechaRegistro)}')
                           ],
                         ),
+                        const SizedBox(width: 6,),
+                        Row(
+                          children: [
+                            const Icon(Icons.location_on_outlined, color: Colors.indigo),
+                            const SizedBox(width: 8,),
+                            Text('Ubicacion: ', style: TextStyle(fontWeight: FontWeight.bold),),
+                          ],
+                        ),
+                        const SizedBox(width: 6,),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${venta.ubicacion}',
+                                softWrap: true,
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 2,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 6,),
                         Row(
                           children: [
                             const Icon(Icons.monetization_on_outlined, color: Colors.indigo),
                             const SizedBox(width: 8,),
-                            Text('Cliente: C\$${venta.total}')
+                            Text('Total: C\$${venta.total}',
+                              style: TextStyle(fontWeight: FontWeight.bold),)
                           ],
                         ),
                         const SizedBox(height: 12),
