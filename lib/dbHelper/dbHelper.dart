@@ -28,6 +28,14 @@ class DbHelper {
       version: 1,
       onCreate: (db, version) async {
         await db.execute('''
+          CREATE TABLE Ubicacion (
+            idUbicacion INTEGER PRIMARY KEY,
+            nombre TEXT NOT NULL,
+            fechaRegistro TEXT NOT NULL
+          )
+        ''');
+
+        await db.execute('''        
        CREATE TABLE CategoriaProducto(
           dCategoriaProducto INTEGER PRIMARY KEY AUTOINCREMENT,
           nombre TEXT NOT NULL,
@@ -35,6 +43,7 @@ class DbHelper {
           usuarioRegistro TEXT NOT NULL,
           estado INTEGER NOT NULL
        )''');
+
         await db.execute('''
         CREATE TABLE SubCategoriaProd (
           idSubCatProd INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -155,9 +164,11 @@ class DbHelper {
           idVenta INTEGER PRIMARY KEY AUTOINCREMENT,
           noVenta TEXT,
           idCliente INTEGER NOT NULL,
+          cliente TEXT NOT NULL,
           credito INTEGER NOT NULL,
           observaciones TEXT,
           enviarA TEXT,
+          ubicacion TEXT,
           sincronizada INTEGER NOT NULL,
           fechaRegistro TEXT NOT NULL,
           usuarioRegistro TEXT NOT NULL,
@@ -187,6 +198,15 @@ class DbHelper {
           nombre TEXT NOT NULL
         )
         ''');
+
+        await db.insert('TipoProducto', {'nombre': 'Herramientas'});
+
+        await db.execute('''
+        CREATE TABLE NumeroConsecutivoVenta(
+          idNumero INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+          noVenta INTEGER
+        )
+        ''');
       },
     );
   }
@@ -196,9 +216,6 @@ class DbHelper {
     final List<Map<String, dynamic>> maps = await db.query("Producto",
         where: 'tipoProducto = ?', whereArgs: [tipoProducto]
     );
-
-    print('Productos: ${maps.toList().toString()}');
-
     return maps.map((map) {
       final mappedData = Map<String, dynamic>.from(map);
       mappedData['estado'] = map['estado'] == 1 ? true : false;
@@ -213,9 +230,6 @@ class DbHelper {
       where: 'idVenta = ?',
       whereArgs: [idVenta]
     );
-
-    print('Detalles: ${maps.toList().toString()}');
-
     return maps.map((map) => DetalleVentaModel.fromMap(map)).toList();
   }
 
@@ -226,10 +240,12 @@ class DbHelper {
       int idVenta = await txn.insert('Venta', {
         'noVenta': venta.noVenta,
         'idCliente': venta.idCliente,
+        'cliente': venta.cliente,
         'credito': venta.credito == true ? 1 : 0,
         'observaciones': venta.observaciones,
         'sincronizada': venta.sincronizada == true ? 1 : 0,
         'enviarA': venta.enviarA,
+        'ubicacion': venta.ubicacion,
         'fechaRegistro': venta.fechaRegistro,
         'usuarioRegistro': venta.usuarioRegistro,
         'estado':  1,
@@ -258,10 +274,7 @@ class DbHelper {
 
   Future<List<VentaModel>> getVentas() async {
     final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query('Venta');
-
-    print('Ventas: ${maps.toList().toString()}');
-
+    final List<Map<String, dynamic>> maps = await db.query('Venta', orderBy: 'idVenta DESC');
     return maps.map((map) {
       final mappedData = Map<String, dynamic>.from(map);
       mappedData['credito'] = map['credito'] == 1 ? true : false;
@@ -274,7 +287,6 @@ class DbHelper {
   Future<List<ClienteModel>> getClientesLocal() async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query('Cliente');
-    print('Clientes: ${maps.toList().toString()}');
     return maps.map((map) {
       final mappedData = Map<String, dynamic>.from(map);
       mappedData['personaNatural'] = map['personaNatural'] == 1 ? true : false;
@@ -316,9 +328,11 @@ class DbHelper {
 
   Future<bool> sincronizarProductosDesdeAPI(String tipoProducto) async {
     final db = await DbHelper().database;
+
     try {
       List<VentaModel> _ventas = await getVentas();
       List<Map<String, dynamic>> detalles = [];
+
 
       for(var venta in _ventas) {
         if(venta.sincronizada == false) {
@@ -347,8 +361,6 @@ class DbHelper {
           };
 
           await requests.postVentas(ventaDet);
-          print('Ventas Sincronizadas');
-
           await db.update(
             'Venta',
             {'sincronizada': 1},
@@ -358,62 +370,100 @@ class DbHelper {
         }
       }
 
-    final List<ClienteModel> clientesAPI = await requests.getClientes();
-      for(var cliente in clientesAPI) {
-        final List<Map<String, dynamic>> existentes = await db.query(
-          'Cliente',
-          where: 'codigo = ?',
-          whereArgs: [cliente.codigo],
-        );
-
-        final clienteMap = cliente.toMap();
-        clienteMap['personaNatural'] = cliente.personaNatural == true ? 1 : 0;
-        clienteMap['estado'] = cliente.estado == true ? 1 : 0;
-
-        if(existentes.isEmpty) {
-          print('Creados');
-          await db.insert('Cliente', clienteMap);
-          print('Creados');
-        } else {
-          print('Actualizados');
-          await db.update(
+      final List<ClienteModel> clientesAPI = await requests.getClientes();
+        for(var cliente in clientesAPI) {
+          final List<Map<String, dynamic>> existentes = await db.query(
             'Cliente',
-              clienteMap,
             where: 'codigo = ?',
             whereArgs: [cliente.codigo],
           );
+
+          final clienteMap = cliente.toMap();
+          print('clienteMap: ${clienteMap.toString()}');
+          clienteMap['personaNatural'] = cliente.personaNatural == true ? 1 : 0;
+          clienteMap['estado'] = cliente.estado == true ? 1 : 0;
+
+          if(existentes.isEmpty) {
+            print('Creados Clientes');
+            await db.insert('Cliente', clienteMap);
+            print('Creados');
+          } else {
+            print('Actualizados Clientes');
+            await db.update(
+              'Cliente',
+                clienteMap,
+              where: 'codigo = ?',
+              whereArgs: [cliente.codigo],
+            );
+          }
         }
-      }
 
-      final List<ProductoModel> productosAPI = await requests.getProductos(tipoProducto);
-      for (final producto in productosAPI) {
-        final List<Map<String, dynamic>> existentes = await db.query(
-          'Producto',
-          where: 'idProducto = ?',
-          whereArgs: [producto.idProducto],
-        );
-
-        final productoMap = producto.toMap();
-        productoMap['estado'] = producto.estado == true ? 1 : 0;
-
-        if (existentes.isEmpty) {
-          print('Creadas');
-          await db.insert('Producto', productoMap);
-        } else {
-          print('Actualizada');
-          await db.update(
+        final List<ProductoModel> productosAPI = await requests.getProductos(tipoProducto);
+        for (final producto in productosAPI) {
+          final List<Map<String, dynamic>> existentes = await db.query(
             'Producto',
-            productoMap,
             where: 'idProducto = ?',
             whereArgs: [producto.idProducto],
           );
+
+          final productoMap = producto.toMap();
+          productoMap['estado'] = producto.estado == true ? 1 : 0;
+
+          if (existentes.isEmpty) {
+            print('Creadas');
+            await db.insert('Producto', productoMap);
+          } else {
+            print('Actualizada');
+            await db.update(
+              'Producto',
+              productoMap,
+              where: 'idProducto = ?',
+              whereArgs: [producto.idProducto],
+            );
+          }
         }
-      }
-      print("Productos sincronizados correctamente.");
-      return true;
+        return true;
     } catch (e) {
       print("Error al sincronizar productos: $e");
       return false;
+    }
+  }
+
+  Future<Map<String, dynamic>> getUbicacion() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('Ubicacion');
+
+    return maps.first;
+  }
+
+  Future<int> getNumeroSugerido() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'NumeroConsecutivoVenta',
+      orderBy: 'noVenta DESC',
+      limit: 1,
+    );
+
+    print('Maps: ${maps.toString()}');
+
+    if(maps.isNotEmpty) {
+      return maps.first['noVenta'] + 1 as int;
+    } else {
+      return 1;
+    }
+  }
+
+  Future<void> insertNoVenta(int noVenta) async {
+    final db = await database;
+    print('Insertando número consecutivo: $noVenta');
+    try {
+      db.transaction((txn) async {
+        txn.insert('NumeroConsecutivoVenta', {
+          "noVenta": noVenta
+        });
+      });
+    } catch (e) {
+      print('Error al insertar el número consecutivo: $e');
     }
   }
 }

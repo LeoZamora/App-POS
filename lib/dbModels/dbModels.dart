@@ -400,15 +400,16 @@ class ProveedorProductoModel {
 
 class VentaModel {
   int? idVenta;
-  String? noVenta; //
-  int? idCliente; //
+  String? noVenta;
+  int? idCliente;
   String? cliente;
-  bool? credito; //
-  String? observaciones; //
-  String? enviarA; //
-  bool? sincronizada;
+  bool? credito;
+  String? observaciones;
+  String? enviarA;
+  String? ubicacion;
+  bool sincronizada;
   String? fechaRegistro;
-  String? usuarioRegistro; //
+  String? usuarioRegistro;
   bool? estado;
   double? total;
 
@@ -420,7 +421,8 @@ class VentaModel {
     this.credito,
     this.observaciones,
     this.enviarA,
-    this.sincronizada,
+    this.ubicacion,
+    required this.sincronizada,
     this.fechaRegistro,
     this.usuarioRegistro,
     this.estado,
@@ -436,6 +438,7 @@ class VentaModel {
       'credito': credito,
       'observaciones': observaciones,
       'enviarA': enviarA,
+      'ubicacion': ubicacion,
       'sincronizada': sincronizada,
       'fechaRegistro': fechaRegistro,
       'usuarioRegistro': usuarioRegistro,
@@ -453,6 +456,7 @@ class VentaModel {
       credito: map['credito'],
       observaciones: map['observaciones'],
       enviarA: map['enviarA'],
+      ubicacion: map['ubicacion'],
       sincronizada: map['sincronizada'],
       fechaRegistro: map['fechaRegistro'],
       usuarioRegistro: map['usuarioRegistro'],
