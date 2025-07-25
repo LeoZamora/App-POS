@@ -407,7 +407,7 @@ class VentaModel {
   String? observaciones;
   String? enviarA;
   String? ubicacion;
-  bool? sincronizada;
+  bool sincronizada;
   String? fechaRegistro;
   String? usuarioRegistro;
   bool? estado;
@@ -422,7 +422,7 @@ class VentaModel {
     this.observaciones,
     this.enviarA,
     this.ubicacion,
-    this.sincronizada,
+    required this.sincronizada,
     this.fechaRegistro,
     this.usuarioRegistro,
     this.estado,

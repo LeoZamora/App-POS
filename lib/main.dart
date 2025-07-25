@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:inversiones_ar/dbHelper/dbHelper.dart';
 import 'package:sqflite/sqflite.dart';
 import 'dart:io';
+import 'package:intl/date_symbol_data_local.dart';
 
 
 Future<void> borrarBaseDeDatos() async {
@@ -28,6 +29,8 @@ final locationServices = UbicationService();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   locationServices.startLocationUpdatesPeriodically();
+  await initializeDateFormatting('es_ES', null);
+
   final db = DbHelper();
 
   // await borrarBaseDeDatos();

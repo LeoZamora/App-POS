@@ -8,6 +8,8 @@ import 'package:internet_connection_checker/internet_connection_checker.dart';
 import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 import 'package:inversiones_ar/services/geolocationServices.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 
 class RegistroVentas extends StatefulWidget {
   const RegistroVentas({super.key});
@@ -161,21 +163,6 @@ class _RegistroVentasState extends State<RegistroVentas> {
 
     if(!mounted) return;
 
-    if(printerService.selectedDeviceAddress == null) {
-      await printerService.showDeviceSelectionDialog(context);
-      if(printerService.selectedDeviceAddress == null) return;
-    }
-
-    for(var item in detalleVenta) {
-      print(item.toString());
-      if(item['precioUnitario'] == null || item['precioUnitario'] <= 0 ) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('El producto ${item['nombre']} no tiene precio asignado'))
-        );
-        return;
-      }
-    }
-
     if(isConnected) {
       print('CONECTADO');
       Position position = await getCurrentLocation();
@@ -209,12 +196,6 @@ class _RegistroVentasState extends State<RegistroVentas> {
         }
       });
 
-      if(productos.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Ingrese uno o mas productos a facturar.'))
-        );
-        return;
-      }
       venta = {
         "noVenta": noVentaController.text,
         "idCliente": _clienteSeleccionado?.codigo,
@@ -278,6 +259,8 @@ class _RegistroVentasState extends State<RegistroVentas> {
         );
 
         if(success) {
+          final num = await _getNumeroVenta();
+          await db.DbHelper().insertNoVenta(num);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Venta registrada'))
           );
@@ -291,10 +274,9 @@ class _RegistroVentasState extends State<RegistroVentas> {
     } else {
       print('DESCONECTADO');
       final Map<String, dynamic> ubicacion = await db.DbHelper().getUbicacion();
-      print('Ubicacion: ${ubicacion.toString()}');
       setState(() {
         productos.clear();
-        location = ubicacion['nombre'];
+        location = ubicacion['nombre'] ?? 'No disponible';
 
         for (var item in detalleVenta) {
           if (item['idProducto'] != null && item['nombre'] != null) {
@@ -323,6 +305,7 @@ class _RegistroVentasState extends State<RegistroVentas> {
         );
         return;
       } else {
+
         final nuevaVenta = VentaModel(
           noVenta: noVentaController.text,
           idCliente: _clienteSeleccionado?.idCliente ?? 0,
@@ -336,7 +319,6 @@ class _RegistroVentasState extends State<RegistroVentas> {
           usuarioRegistro: 'POSVentas',
           total: totalVenta
         );
-
 
         final List<DetalleVentaModel> detalle = detalleVenta.map((map) {
           print(map.toString());
@@ -354,7 +336,6 @@ class _RegistroVentasState extends State<RegistroVentas> {
           );
         }).toList();
 
-        print('NUEVA VENTA: ${nuevaVenta.ubicacion.toString()}');
         await db.DbHelper().registrarVenta(nuevaVenta,  detalle);
         final bool success = await printerService.imprimirFactura(
           context: context,
@@ -364,6 +345,8 @@ class _RegistroVentasState extends State<RegistroVentas> {
           tipoCambio: 36.6243,
         );
         if(success) {
+          final num = await _getNumeroVenta();
+          await db.DbHelper().insertNoVenta(num);
           ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Factura enviada'))
           );
@@ -417,6 +400,40 @@ class _RegistroVentasState extends State<RegistroVentas> {
     actualizarTotal();
   }
 
+  Future<void> _checkInitialConnection() async {
+    final hasConnection = await InternetConnectionChecker.instance.hasConnection;
+    if (mounted && hasConnection) {
+      setState(() => isConnected = hasConnection);
+    }
+  }
+
+  void _mostrarDialogoMontos() async {
+    final result = await showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: ShowDialogMontos(
+          montoTotal: totalVenta,
+          impimir: _imprimirFactura,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _setNumeroVenta() async {
+    final numero = await _getNumeroVenta();
+    noVentaController.text = 'POS-$numero';
+  }
+
+  Future<int> _getNumeroVenta() {
+    final dbHelper = db.DbHelper();
+    return dbHelper.getNumeroSugerido();
+  }
+
+  String formattedNumber(double monto) {
+    return NumberFormat("#,##0.00", "es_US").format(monto);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -424,20 +441,21 @@ class _RegistroVentasState extends State<RegistroVentas> {
      _clientesLocalFuture = getClientesLocales();
      getTipoProductos();
      getClientesLocales();
+     _setNumeroVenta();
 
-     connectionChecker.hasConnection.then((value) => {
-       if(mounted) {
-         setState(() {
-           isConnected = value;
-         })
-       }
-     });
+     _checkInitialConnection();
 
-     _connectionStatus = connectionChecker.onStatusChange.listen((status) {
+     _connectionStatus = InternetConnectionChecker.instance.onStatusChange.listen((status) async {
        if(mounted) {
-         setState(() {
-           isConnected = status == InternetConnectionStatus.connected;
-         });
+         bool newStatus = status == InternetConnectionStatus.connected;
+
+         if(newStatus != isConnected) {
+           setState(() => isConnected = newStatus);
+           print('SINCROIZANDO .....');
+           await getProductosLocal('Herramientas');
+           await getTipoProductos();
+           await getClientesLocales();
+         }
        }
      });
 
@@ -450,11 +468,26 @@ class _RegistroVentasState extends State<RegistroVentas> {
 
   @override
   Widget build(BuildContext context) {
+    final printerService = context.watch<PrinterService>();
+
     final estiloInput = InputDecorationTheme(
       filled: true,
-      fillColor: Colors.grey[100],
+      fillColor: Colors.white,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.grey),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.grey),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.indigo, width: 2),
+      ),
+      hintStyle: const TextStyle(color: Colors.grey),
+      labelStyle: const TextStyle(color: Colors.indigo),
     );
 
     return Scaffold(
@@ -462,8 +495,15 @@ class _RegistroVentasState extends State<RegistroVentas> {
         title: const Text('Registrar Venta', style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.indigo,
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          Icon(
+            isConnected ? Icons.wifi : Icons.wifi_off,
+            color: isConnected ? Colors.green : Colors.red,
+          ),
+          const SizedBox(width: 10),
+        ],
       ),
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF7F8FA),
       body: Stack(
         children: [
           Theme(
@@ -475,35 +515,19 @@ class _RegistroVentasState extends State<RegistroVentas> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            keyboardType: TextInputType.number,
-                            controller: noVentaController,
-                            decoration: const InputDecoration(
-                              labelText: 'No. Venta',
-                              isDense: true
-                            )
-                          ),
-                        )
-                      ],
+                    TextFormField(
+                      controller: noVentaController,
+                      readOnly: true,
+                      decoration: const InputDecoration(
+                        labelText: 'No. Venta',
+                        isDense: true,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     FutureBuilder<List<ClienteModel>>(
-                      future: isConnected ?  _clientes : _clientesLocalFuture,
+                      future: _clientesLocalFuture,
                       builder: (context, snapshot) {
-                        if(isConnected) {
-                          if(snapshot.connectionState == ConnectionState.waiting) {
-                            return const Center(child: CircularProgressIndicator());
-                          } else if(snapshot.hasError) {
-                            return Text('Error: ${snapshot.error}');
-                          } else if(snapshot.hasData && snapshot.data!.isEmpty) {
-                            return Text('No hay clientes registrados');
-                          }
-                        }
-
-                        final clientes = snapshot.data!;
+                        final clientes = snapshot.data ?? [];
 
                         return DropdownButtonFormField<ClienteModel>(
                           value: _clienteSeleccionado,
@@ -515,69 +539,74 @@ class _RegistroVentasState extends State<RegistroVentas> {
                               value: cliente,
                               child: Text(cliente.codigo ?? 'Sin nombre'),
                             );
-                          }).toList()
+                          }).toList(),
                         );
-                      }
+                      },
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
                     SwitchListTile(
-                      title: Text(_esCredito ? 'Venta a crédito' : 'Contado'),
+                      title: Text(
+                        _esCredito ? 'Venta a crédito' : 'Contado',
+                        style: const TextStyle(fontSize: 14),
+                      ),
                       dense: true,
                       activeColor: Colors.indigo,
                       value: _esCredito,
                       onChanged: (v) => setState(() => _esCredito = v),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
                     TextFormField(
                       controller: observacionesController,
                       decoration: const InputDecoration(
-                          labelText: 'Observaciones',
-                          isDense: true
+                        labelText: 'Observaciones',
+                        isDense: true,
                       ),
                     ),
                     const SizedBox(height: 16),
-
                     TextFormField(
                       controller: enviarAController,
                       decoration: const InputDecoration(
-                          labelText: 'Enviar a',
-                          isDense: true
+                        labelText: 'Enviar a',
+                        isDense: true,
                       ),
                     ),
                     const SizedBox(height: 24),
-
-                    const Divider(),
-                    const Text("Detalle de productos", style: TextStyle(fontWeight: FontWeight.bold)),
+                    Divider(color: Colors.grey[300]),
+                    const Text(
+                      "Detalle de productos",
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                        color: Colors.indigo,
+                      ),
+                    ),
                     const SizedBox(height: 12),
 
                     ...detalleVenta.asMap().entries.map((entry) {
                       final index = entry.key;
                       final producto = entry.value;
                       final productos = isConnected ? _productos : _productosLocales;
-                      final uniqueProductos = productos.toSet().toList();
                       final uniqueTiposProductos = _tiposProductos.toSet().toList();
 
-                      // Inicializa el controlador si no existe
                       if (!_precioControllers.containsKey(index)) {
                         _precioControllers[index] = TextEditingController(
                           text: producto['precioUnitario'].toString(),
                         );
                       } else {
-                        // Actualiza el valor del controlador si el precio cambió
                         _precioControllers[index]!.text = producto['precioUnitario'].toString();
                       }
 
-
                       return Card(
+                        elevation: 2.5,
                         color: Colors.white,
-                        elevation: 4.0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         margin: const EdgeInsets.symmetric(vertical: 6),
                         child: Padding(
                           padding: const EdgeInsets.all(12),
                           child: Column(
                             children: [
                               DropdownButtonFormField<String>(
-                                decoration: InputDecoration(labelText: 'Selecciona un tipo de producto'),
+                                decoration: const InputDecoration(labelText: 'Selecciona un tipo de producto'),
                                 isDense: true,
                                 isExpanded: true,
                                 value: tipo,
@@ -592,27 +621,21 @@ class _RegistroVentasState extends State<RegistroVentas> {
                                     producto['productosFiltrados'] = [];
                                   });
 
-                                  // Cargar productos del tipo seleccionado
-                                  List<ProductoModel> productosFiltrados;
-                                  if (isConnected) {
-                                    productosFiltrados = await getProductos(value.toString());
-                                  } else {
-                                    final dbHelper = db.DbHelper();
-                                    final local = await dbHelper.getProductos(value.toString());
-                                    productosFiltrados = local;
-                                  }
+                                  final productosFiltrados = isConnected
+                                      ? await getProductos(value.toString())
+                                      : await db.DbHelper().getProductos(value.toString());
 
                                   setState(() {
                                     producto['productosFiltrados'] = productosFiltrados;
                                   });
                                 },
-                                validator: (value) => value == null ? 'Seleccione un tipo de producto' : value,
+                                validator: (value) => value == null ? 'Seleccione un tipo de producto' : null,
                                 items: uniqueTiposProductos.map((tipo) {
                                   return DropdownMenuItem<String>(
                                     value: tipo.nombre,
                                     child: Text(tipo.nombre.toString()),
                                   );
-                                }).toList()
+                                }).toList(),
                               ),
                               const SizedBox(height: 10),
                               DropdownButtonFormField<String>(
@@ -623,24 +646,21 @@ class _RegistroVentasState extends State<RegistroVentas> {
                                   setState(() {
                                     isStock = false;
                                     final selected = producto['productosFiltrados'].firstWhere(
-                                          (p) => p.idProducto.toString() == value.toString()
+                                          (p) => p.idProducto.toString() == value.toString(),
                                     );
-                                    if(selected.cantidadTotal <= 0 || selected.cantidadTotal == null) {
+                                    if (selected.cantidadTotal <= 0 || selected.cantidadTotal == null) {
                                       isStock = true;
                                       ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('No hay stock disponible'))
+                                        const SnackBar(content: Text('No hay stock disponible')),
                                       );
                                       detalleVenta.removeAt(index);
                                       return;
                                     }
-
-                                    if (selected != null) {
-                                      producto['idProducto'] = selected.idProducto;
-                                      producto['nombre'] = selected.nombre;
-                                      producto['precioUnitario'] = selected.precio;
-                                      producto['total'] = 0;
-                                      calcularTotalItem(index);
-                                    }
+                                    producto['idProducto'] = selected.idProducto;
+                                    producto['nombre'] = selected.nombre;
+                                    producto['precioUnitario'] = selected.precio;
+                                    producto['total'] = 0;
+                                    calcularTotalItem(index);
                                   });
                                 },
                                 items: (producto['productosFiltrados'] as List)
@@ -658,11 +678,10 @@ class _RegistroVentasState extends State<RegistroVentas> {
                                     child: TextFormField(
                                       initialValue: producto['cantidad'].toString(),
                                       keyboardType: TextInputType.number,
-                                      readOnly: isStock ? true : false,
+                                      readOnly: isStock,
                                       decoration: const InputDecoration(labelText: 'Cantidad'),
                                       onChanged: (value) {
                                         setState(() {
-                                          producto['total'] = 0;
                                           producto['cantidad'] = double.tryParse(value) ?? 1;
                                           producto['total'] = producto['precioUnitario'] * producto['cantidad'];
                                           calcularTotalItem(index);
@@ -675,18 +694,15 @@ class _RegistroVentasState extends State<RegistroVentas> {
                                     child: TextFormField(
                                       controller: _precioControllers[index],
                                       keyboardType: TextInputType.number,
-                                      readOnly: isStock ? true : false,
+                                      readOnly: isStock,
                                       decoration: const InputDecoration(labelText: 'Precio U'),
                                       onChanged: (value) {
-                                        print('Precio del producto $value');
                                         final precio = double.tryParse(value);
                                         if (precio != null) {
                                           setState(() {
                                             producto['precioUnitario'] = precio;
                                             calcularTotalItem(index);
                                           });
-                                        } else {
-                                          print("Precio inválido: '$value'");
                                         }
                                       },
                                     ),
@@ -702,7 +718,7 @@ class _RegistroVentasState extends State<RegistroVentas> {
                                     ),
                                   ),
                                   IconButton(
-                                    icon: const Icon(Icons.delete, color: Colors.indigo),
+                                    icon: const Icon(Icons.delete, color: Colors.red),
                                     onPressed: () => eliminarProducto(index),
                                   ),
                                 ],
@@ -721,12 +737,14 @@ class _RegistroVentasState extends State<RegistroVentas> {
                         label: const Text("Agregar producto"),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.indigo,
+                          backgroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                           side: const BorderSide(color: Colors.indigo),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                       ),
                     ),
                     const SizedBox(height: 32),
-
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
@@ -738,7 +756,37 @@ class _RegistroVentasState extends State<RegistroVentas> {
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        onPressed: () => _imprimirFactura(),
+                        onPressed: () async {
+                          if(_clienteSeleccionado == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Seleccione un cliente')),
+                            );
+                            return;
+                          }
+
+                          if(detalleVenta.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Ingrese uno o mas productos a facturar.'))
+                            );
+                            return;
+                          }
+
+                          for(var item in detalleVenta) {
+                            if(item['precioUnitario'] == null || item['precioUnitario'] <= 0 ) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('El producto ${item['nombre']} no tiene precio asignado'))
+                              );
+                              return;
+                            }
+                          }
+
+                          if (printerService.selectedDeviceAddress == null) {
+                            await printerService.showDeviceSelectionDialog(context);
+                            if (printerService.selectedDeviceAddress == null) return;
+                          } else {
+                            _mostrarDialogoMontos();
+                          }
+                        },
                       ),
                     ),
                   ],
@@ -746,28 +794,29 @@ class _RegistroVentasState extends State<RegistroVentas> {
               ),
             ),
           ),
-          Positioned(top: 16,
+          Positioned(
+            top: 16,
             right: 16,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.grey,
-                borderRadius: BorderRadius.circular(12),
+                color: Colors.indigo.withOpacity(0.9),
+                borderRadius: BorderRadius.circular(16),
                 boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 6)],
               ),
               child: Row(
                 children: [
-                  Text('TOTAL',
+                  const Text(
+                    'TOTAL C\$',
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                     ),
                   ),
-                  const Icon(Icons.attach_money, color: Colors.white, size: 20),
                   const SizedBox(width: 4),
                   Text(
-                    totalVenta.toStringAsFixed(2),
+                    formattedNumber(totalVenta),
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -776,10 +825,106 @@ class _RegistroVentasState extends State<RegistroVentas> {
                   )
                 ],
               ),
-            )
-          )
-        ]
-      )
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+}
+
+class ShowDialogMontos extends StatefulWidget {
+  final Future<void> Function() impimir;
+  final double montoTotal;
+
+  const ShowDialogMontos({super.key,
+    required this.montoTotal,
+    required this.impimir,
+  });
+
+  @override
+  _ShowDialog createState() => _ShowDialog();
+}
+
+class _ShowDialog extends State<ShowDialogMontos> {
+  final TextEditingController _montoPagoController = TextEditingController();
+  double _cambio = 0.0;
+
+  void _calcularCambio() {
+    final pago = double.tryParse(_montoPagoController.text.replaceAll(',', '.')) ?? 0.0;
+    setState(() {
+      _cambio = pago - widget.montoTotal;
+    });
+  }
+
+  @override
+  void dispose() {
+    _montoPagoController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Text(
+            'Total a pagar: \$${widget.montoTotal.toStringAsFixed(2)}',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _montoPagoController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+            ],
+            decoration: const InputDecoration(
+              labelText: 'Monto recibido',
+              border: OutlineInputBorder(),
+              isDense: true,
+              prefixText: 'C\$'
+            ),
+            onChanged: (value) => _calcularCambio(),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Cambio: \$${_cambio.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: 16,
+              color: _cambio < 0 ? Colors.red : Colors.green,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: () async {
+              if (_cambio >= 0) {
+                await widget.impimir();
+                Navigator.pop(context, {
+                  'pago': double.tryParse(_montoPagoController.text) ?? 0.0,
+                  'cambio': _cambio,
+                });
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('El pago es insuficiente.')),
+                );
+              }
+            },
+            child: const Text('Aceptar'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.indigo,
+              foregroundColor: Colors.white,
+              maximumSize: Size(double.infinity, 50),
+              // padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

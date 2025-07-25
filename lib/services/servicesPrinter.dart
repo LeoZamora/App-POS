@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 
 class PrinterService with ChangeNotifier {
   static final PrinterService _instance = PrinterService._internal();
@@ -30,12 +31,16 @@ class PrinterService with ChangeNotifier {
 
   Future<Uint8List?> _loadLogoBytes() async {
     try {
-      final ByteData byteData = await rootBundle.load('assets/imgs/zafiroLogo.png');
+      final ByteData byteData = await rootBundle.load('assets/imgs/logoZafiro.jpg');
       return byteData.buffer.asUint8List();
     } catch (e) {
       print("Error cargando el logo: $e");
       return null;
     }
+  }
+
+  String formattedNumber(double monto) {
+    return NumberFormat("#,##0.00", "es_US").format(monto);
   }
 
   String generarTextoFacturaConDetalle({
@@ -80,10 +85,10 @@ class PrinterService with ChangeNotifier {
     final String symbolDolar = String.fromCharCode(36);
 
     buffer.writeln('');
-    buffer.writeln('SUBTOTAL    :         ${symbolCor + subtotal.toStringAsFixed(2).padLeft(8)}');
-    buffer.writeln('IVA ($ivaPorcentaje%) :         ${symbolCor + iva.toStringAsFixed(2).padLeft(8)}');
-    buffer.writeln('TOTAL       :         ${symbolCor + total.toStringAsFixed(2).padLeft(8)}');
-    buffer.writeln('TOTAL       :         ${symbolDolar + (total / tipoCambio).toStringAsFixed(2).padLeft(9)}');
+    buffer.writeln('SUBTOTAL    :        ${symbolCor + formattedNumber(subtotal).padLeft(8)}');
+    buffer.writeln('IVA ($ivaPorcentaje%) :          ${symbolCor + iva.toStringAsFixed(2).padLeft(8)}');
+    buffer.writeln('TOTAL       :        ${symbolCor + formattedNumber(total).padLeft(8)}');
+    buffer.writeln('TOTAL       :        ${symbolDolar + formattedNumber((total / tipoCambio)).padLeft(9)}');
     buffer.writeln('Tipo Cambio :         ${symbolCor + tipoCambio.toStringAsFixed(2).padLeft(8)}');
 
     buffer.writeln('');

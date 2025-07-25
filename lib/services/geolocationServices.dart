@@ -13,7 +13,7 @@ class UbicationService {
   void startLocationUpdatesPeriodically() {
     _timer?.cancel();
 
-    _timer = Timer.periodic(const Duration(minutes: 1), (timer) async {
+    _timer = Timer.periodic(Duration(minutes: 1), (timer) async {
       isConnected = await connectionChecker.hasConnection;
 
       if(isConnected) {

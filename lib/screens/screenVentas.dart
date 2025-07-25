@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:inversiones_ar/dbHelper/dbHelper.dart';
 import 'package:inversiones_ar/dbModels/dbModels.dart';
-import 'package:inversiones_ar/requestHttp/requestHttp.dart';
 import 'package:inversiones_ar/services/servicesPrinter.dart';
 import 'package:provider/provider.dart';
 import 'package:inversiones_ar/helpers/formatters.dart' as helpers;
-import 'dart:async';
 import 'package:internet_connection_checker/internet_connection_checker.dart';
+import 'dart:async';
+import 'package:intl/date_symbol_data_local.dart';
 
 class VentasScreen extends StatefulWidget {
   const VentasScreen({super.key});
@@ -47,7 +47,7 @@ class _VentasScreenState extends State<VentasScreen> {
         })).toList();
       });
 
-      print('Ventas locales: ${_ventasLocales[1].toString()}');
+      print('Ventas locales: ${_ventasLocales[0].toString()}');
     } catch (e) {
       print('Error al obtener las ventas locales: $e');
     }
@@ -113,7 +113,7 @@ class _VentasScreenState extends State<VentasScreen> {
               printerService.showDeviceSelectionDialog(context);
             },
           ),
-          IconButton(onPressed: () => {}, icon: Icon(Icons.search))
+          // IconButton(onPressed: () => {}, icon: Icon(Icons.search))
         ],
       ),
       body: Column(
@@ -145,23 +145,22 @@ class _VentasScreenState extends State<VentasScreen> {
                               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                             ),
                             const Spacer(),
-                            // IconButton(
-                            //     onPressed: () async {
-                            //       // Aquí podrías agregar una vista de detalles
-                            //     },
-                            //     icon: Icon(
-                            //       Icons.visibility_outlined,
-                            //       color: Colors.amber.withAlpha(250),
-                            //     )
-                            // )
+                            IconButton(
+                                onPressed: () async {},
+                                icon: Icon(
+                                  venta.sincronizada ? Icons.sync : Icons.sync_problem_outlined,
+                                  color: venta.sincronizada ? Colors.green : Colors.red,
+                                ),
+                              tooltip: venta.sincronizada ? 'Sincronizado' : 'No sincronizado',
+                            )
                           ],
                         ),
                         Row(
                           children: [
                             const Icon(Icons.person_outline, color: Colors.indigo),
                             const SizedBox(width: 8,),
-                            Text('Cliente: ', style: TextStyle(fontWeight: FontWeight.bold),),
-                            Text('${venta.cliente ?? venta.cliente}')
+                            Text('ID Cliente: ', style: TextStyle(fontWeight: FontWeight.bold),),
+                            Text('${venta.cliente ?? venta.idCliente}')
                           ],
                         ),
                         const SizedBox(width: 6,),
