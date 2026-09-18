@@ -24,7 +24,6 @@ import java.io.OutputStream
 import java.nio.charset.Charset;
 import java.util.*
 import kotlin.collections.isNotEmpty
-
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "printer_channel"
     private var bluetoothSocket: BluetoothSocket? = null

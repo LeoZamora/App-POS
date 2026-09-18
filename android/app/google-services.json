@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "204098631598",
+    "project_id": "posdevodigital",
+    "storage_bucket": "posdevodigital.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:204098631598:android:702b2fb6e300955adafa3f",
+        "android_client_info": {
+          "package_name": "com.example.inversiones_ar"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAoBk1IGuXWF1q2hURm-cWHYIpiG3THSEI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

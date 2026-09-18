@@ -1,56 +1,49 @@
 import 'dart:async';
 import 'package:flutter/cupertino.dart';
-import 'package:inversiones_ar/dbHelper/dbHelper.dart' as db;
-import 'package:inversiones_ar/dbModels/dbModels.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class StateServices extends ChangeNotifier {
   bool _isLoading = false;
   int _ventasSync = 0;
   int _ventasNotSync = 0;
   double _totalVentas = 0;
+  String? _token;
+  bool _isInitialized = false;
   Timer? _timer;
 
   // GETTERS
+  bool get isAuthenticated => _token != null;
+  bool get isInitialized => _isInitialized;
+
   bool get isLoading => _isLoading;
   int get ventasSync => _ventasSync;
   int get ventasNotSync => _ventasNotSync;
   double get totalVentas => _totalVentas;
 
-  void login(bool value) {
-    _isLoading = value;
+  Future<void> verificarTokenPersistente() async {
+    final prefs = await SharedPreferences.getInstance();
+    _token = prefs.getString('auth_token'); // Intentamos leer el token guardado
+    _isInitialized = true;
+    notifyListeners(); // Notifica a GoRouter que ya sabemos si hay token o no
+  }
+
+  Future<bool> login(String token) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('auth_token', token);
+
+      _token = token;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<void> logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+    _token = null;
     notifyListeners();
   }
- void logout() {
-    _isLoading = false;
-    notifyListeners();
- }
-
- void updateInfoVentas() {
-    _timer?.cancel();
-
-    _timer = Timer.periodic(Duration(seconds: 10), (timer) async {
-      _ventasSync = 0;
-      _ventasNotSync = 0;
-      _totalVentas = 0;
-      List<VentaModel> _ventas = await db.DbHelper().getVentas();
-
-      for(var venta in _ventas) {
-        DateTime fechaVenta = DateTime.parse(venta.fechaRegistro!);
-        DateTime ahora = DateTime.now();
-        bool esHoy = fechaVenta.year == ahora.year &&
-            fechaVenta.month == ahora.month &&
-            fechaVenta.day == ahora.day;
-
-        if(venta.sincronizada == true){
-          _ventasSync++;
-          if(esHoy) {
-            _totalVentas += venta.total!;
-          }
-        } else {
-          _ventasNotSync++;
-        }
-      }
-      notifyListeners();
-    });
- }
 }

@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
+// import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:inversiones_ar/dbModels/dbModels.dart';
+import 'package:inversiones_ar/requestHttp/requestHttp.dart';
+import 'package:inversiones_ar/widgets/ToatsSnackBar.dart';
 
 class PrinterService with ChangeNotifier {
   static final PrinterService _instance = PrinterService._internal();
@@ -22,16 +27,9 @@ class PrinterService with ChangeNotifier {
   String _connectionStatus = "Desconectado";
   bool _isPrinting = false;
 
-  void _showSnackBar(BuildContext context, String message) {
-    if (ScaffoldMessenger.maybeOf(context) != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)));
-    }
-  }
-
   Future<Uint8List?> _loadLogoBytes() async {
     try {
-      final ByteData byteData = await rootBundle.load('assets/imgs/logoZafiro.jpg');
+      final ByteData byteData = await rootBundle.load('assets/devo/32px.png');
       return byteData.buffer.asUint8List();
     } catch (e) {
       print("Error cargando el logo: $e");
@@ -44,10 +42,12 @@ class PrinterService with ChangeNotifier {
   }
 
   String generarTextoFacturaConDetalle({
-    required Map<String, dynamic> venta,
+    required VentaModel? venta,
     required List<Map<String, dynamic>> productos,
+    bool isCopy = false,
+    bool? showIva = false,
     double ivaPorcentaje = 15,
-    double tipoCambio = 36.6243,
+    double tipoCambio = 36.50,
   }) {
     final buffer = StringBuffer();
 
@@ -56,23 +56,26 @@ class PrinterService with ChangeNotifier {
       subtotal += p['cantidad'] * p['precioUnitario'];
     }
     double iva = subtotal * (ivaPorcentaje / 100);
-    double total = subtotal + iva;
+    double total = (showIva ?? false) ? subtotal + iva : subtotal;
 
-    buffer.writeln('       Tel: +505 8888-8888       '.toString());
-    buffer.writeln('Factura No:                ${venta["noVenta"].toString().padLeft(5, '0')}');
-    buffer.writeln('Credito:                      ${venta["credito"] == true ? 'SI' : 'NO'}');
-    buffer.writeln('Cliente : ${venta["idCliente"].toString().padLeft(20)}');
-    buffer.writeln('Fecha:                ${venta["fechaRegistro"]?.substring(0, 10)}');
+    buffer.writeln("        Migdalia's Market       ".toString());
+    buffer.writeln('       Tel: +505 8652-6458       '.toString());
+    buffer.writeln('Ticket No:            ${venta?.noVenta.toString().padLeft(5, '0')}');
+    buffer.writeln('Credito:                      ${venta?.credito == true ? 'SI' : 'NO'}');
+    buffer.writeln('Cliente : ${venta?.cliente.toString().padLeft(20)}');
+    buffer.writeln('Fecha:                ${venta?.fechaRegistro?.substring(0, 10)}');
     buffer.writeln('');
-    buffer.writeln('Enviar a:                ${venta["enviarA"]}');
+    buffer.writeln('Enviar a:');
+    buffer.writeln(venta?.enviarA ?? "- - -");
     buffer.writeln('Descripcion:');
-    buffer.writeln('${venta["observaciones"] ?? "- - -"}');
+    buffer.writeln(venta?.observaciones ?? "- - -");
+    buffer.writeln('');
     buffer.writeln('-------------------------------');
-    buffer.writeln('Cant| Producto        | Total');
+    buffer.writeln('Cant   |  Producto  |  Total');
     buffer.writeln('-------------------------------');
     for (var p in productos) {
-      final cant = p['cantidad'].toString().padLeft(1).substring(0, 1);
-      final nombre = (p['nombre'] as String).padRight(16).substring(0, 16);
+      final cant = p['cantidad'].toString().padLeft(1).padRight(2);
+      final nombre = (p['nombre'] as String).padRight(8).substring(0, 8);
       final totalLinea = (p['cantidad'] * p['precioUnitario'])
           .toStringAsFixed(2)
           .padLeft(6)
@@ -86,15 +89,18 @@ class PrinterService with ChangeNotifier {
 
     buffer.writeln('');
     buffer.writeln('SUBTOTAL    :        ${symbolCor + formattedNumber(subtotal).padLeft(8)}');
-    buffer.writeln('IVA ($ivaPorcentaje%) :          ${symbolCor + iva.toStringAsFixed(2).padLeft(8)}');
+    if (showIva ?? false) {
+    buffer.writeln('IVA ($ivaPorcentaje%) :        ${symbolCor + iva.toStringAsFixed(2).padLeft(8)}');
+    }
     buffer.writeln('TOTAL       :        ${symbolCor + formattedNumber(total).padLeft(8)}');
-    buffer.writeln('TOTAL       :        ${symbolDolar + formattedNumber((total / tipoCambio)).padLeft(9)}');
-    buffer.writeln('Tipo Cambio :         ${symbolCor + tipoCambio.toStringAsFixed(2).padLeft(8)}');
+    // buffer.writeln('TOTAL       :        ${symbolDolar + formattedNumber((total / tipoCambio)).padLeft(9)}');
+    // buffer.writeln('Tipo Cambio :        ${symbolCor + tipoCambio.toStringAsFixed(2).padLeft(8)}');
 
     buffer.writeln('');
-    buffer.writeln('| !Gracias por su preferencia! |');
-    // buffer.writeln('|      www.minegocio.com       |');
-    buffer.writeln('');
+    buffer.writeln('|   !Gracias por su compra!   |');
+    buffer.writeln('|   Ante cualquier duda  o    |\n|   consulta, comunicarse a   |\n|       +505 8652-6458        |');
+    buffer.writeln('|                             |');
+    buffer.writeln('|            ${isCopy ? 'COPIA' : '     '}            |');
 
     return buffer.toString();
   }
@@ -103,13 +109,21 @@ class PrinterService with ChangeNotifier {
     try {
       final bool? granted = await platform.invokeMethod("checkBluetoothPermissions");
       if (granted == false && context != null) {
-        _showSnackBar(context, "Los permisos de Bluetooth son necesarios. Por favor, concédelos en los ajustes de la app.");
+        ToastSnackBar.show(
+          context,
+          message: 'Los permisos de Bluetooth son necesarios. \nPor favor, concédelos en los ajustes de la app.',
+          type: ToastType.warning,
+        );
       }
       return granted ?? false;
     } on PlatformException catch (e) {
       print("Error al verificar permisos de Bluetooth: ${e.message}");
       if (context != null) {
-        _showSnackBar(context, "Error al verificar permisos: ${e.message}");
+        ToastSnackBar.show(
+          context,
+          message: 'Error al verificar permisos de Bluetooth: ${e.message}',
+          type: ToastType.error,
+        );
       }
       return false;
     }
@@ -130,14 +144,24 @@ class PrinterService with ChangeNotifier {
       bool ultimatelyGranted = await checkBluetoothPermissions(context: context);
 
       if (ultimatelyGranted) {
-        if (context != null) _showSnackBar(context, "Permisos de Bluetooth concedidos.");
+        if (context != null) {
+          ToastSnackBar.show(
+            context,
+            message: 'Permisos de Bluetooth concedidos.',
+            type: ToastType.success,
+          );
+        }
       }
       return ultimatelyGranted;
     } on PlatformException catch (e) {
       print("Error al solicitar permisos de Bluetooth: ${e.message}");
-      // if (context != null) {
-      //   _showSnackBar(context, "Error al solicitar permisos: ${e.message}");
-      // }
+      if (context != null) {
+        ToastSnackBar.show(
+          context,
+          message: 'Error al solicitar permisos de Bluetooth: ${e.message}',
+          type: ToastType.error,
+        );
+      }
       return false;
     }
   }
@@ -159,7 +183,11 @@ class PrinterService with ChangeNotifier {
         // _showSnackBar(context, msgError);
       }
     } on PlatformException catch (e) {
-      _showSnackBar(context, 'Error al obtener dispositivos: ${e.message}');
+      ToastSnackBar.show(
+        context,
+        message: 'Error al obtener dispositivos vinculados: ${e.message}',
+        type: ToastType.error,
+      );
       _pairedDevices = [];
       notifyListeners();
     }
@@ -167,18 +195,33 @@ class PrinterService with ChangeNotifier {
 
   Future<void> connectToDevice(BuildContext context, String address) async { // Pasa BuildContext
     if (_isConnecting) return;
-    _isConnecting = true;
-    _connectionStatus = "Conectando a ${address}...";
-    _showSnackBar(context, _connectionStatus);
-    notifyListeners();
+
     try {
+      _isConnecting = true;
+      _connectionStatus = "Conectando a ${address}...";
+      ToastSnackBar.show(
+        context,
+        message: 'Conectando a ${address}...',
+        type: ToastType.info,
+      );
+
       final String? result = await platform.invokeMethod("connectToDevice", {"address": address});
       _connectionStatus = result ?? "Conectado";
       _selectedDeviceAddress = address;
-      _showSnackBar(context, result ?? "Conectado exitosamente");
+      ToastSnackBar.show(
+        context,
+        message: 'Conectado a ${address}',
+        type: ToastType.success,
+      );
+      notifyListeners();
     } on PlatformException catch (e) {
       _connectionStatus = "Error de conexión: ${e.message}";
-      _showSnackBar(context, "Error al conectar: ${e.message}");
+      ToastSnackBar.show(
+        context,
+        message: 'Error de conexión: ${e.message}',
+        type: ToastType.error,
+      );
+      notifyListeners();
     } finally {
       _isConnecting = false;
       notifyListeners();
@@ -192,9 +235,17 @@ class PrinterService with ChangeNotifier {
       _connectionStatus = "Desconectado";
       _selectedDeviceAddress = null;
       notifyListeners();
-      _showSnackBar(context, "Desconectado de la impresora.");
-    // } on PlatformException catch (e) {
-      // _showSnackBar(context, "Error al desconectar: ${e.message}");
+      ToastSnackBar.show(
+        context,
+        message: 'Desconectado',
+        type: ToastType.success,
+      );
+    } catch (e) {
+      ToastSnackBar.show(
+        context,
+        message: 'Error al desconectar: ${e.toString()}',
+        type: ToastType.error,
+      );
     } finally {
       notifyListeners();
     }
@@ -265,13 +316,19 @@ class PrinterService with ChangeNotifier {
 
   Future<bool> imprimirFactura({
     required BuildContext context,
-    required Map<String, dynamic> venta,
+    required VentaModel? venta,
     required List<Map<String, dynamic>> productos,
+    bool isCopy = false,
+    bool? showIva = false,
     double ivaPorcentaje = 15,
-    double tipoCambio = 36.6243,
+    double tipoCambio = 36.50,
   }) async {
     if (_selectedDeviceAddress == null) {
-      _showSnackBar(context, "Por favor, selecciona y conecta una impresora primero.");
+      ToastSnackBar.show(
+        context,
+        message: 'Por favor, selecciona y conecta una impresora primero.',
+        type: ToastType.warning,
+      );
       await showDeviceSelectionDialog(context);
       if(_selectedDeviceAddress == null) return false;
     }
@@ -281,12 +338,14 @@ class PrinterService with ChangeNotifier {
     notifyListeners();
 
     try {
+      // final showIva = await getParametroFirebase();
       Uint8List? logoBytes = await _loadLogoBytes();
       logoBytes = await _loadLogoBytes();
-      print(logoBytes);
       final String textoFactura = generarTextoFacturaConDetalle(
         venta: venta,
         productos: productos,
+        isCopy: isCopy,
+        showIva: showIva,
         ivaPorcentaje: ivaPorcentaje,
         tipoCambio: tipoCambio,
       );
@@ -299,15 +358,18 @@ class PrinterService with ChangeNotifier {
 
       final String? result = await platform.invokeMethod("printFactura", printPayload);
 
-      _showSnackBar(context, 'Imprimiendo factura...');
+      ToastSnackBar.show(
+        context,
+        message: 'Imprimiendo ticket...',
+        type: ToastType.success,
+        duration: const Duration(seconds: 3),
+      );
       return true;
     } on PlatformException catch (e) {
       if (e.code == "NOT_CONNECTED") {
         if (_selectedDeviceAddress != null) {
           await connectToDevice(context, _selectedDeviceAddress!);
-          // _showSnackBar(context,  'Reintentando imprimir...');
           notifyListeners();
-          // imprimirFactura(context: context, venta: venta, productos: productos, ivaPorcentaje: ivaPorcentaje, tipoCambio: tipoCambio);
         } else {
           await showDeviceSelectionDialog(context);
         }
@@ -319,3 +381,7 @@ class PrinterService with ChangeNotifier {
     }
   }
 }
+
+final printerProvider = ChangeNotifierProvider((ref) {
+  return  PrinterService();
+});

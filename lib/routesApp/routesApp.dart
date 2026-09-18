@@ -5,33 +5,38 @@ import 'package:provider/provider.dart';
 import 'package:inversiones_ar/services/stateServices.dart';
 import '../login/loginApp.dart';
 
-final GoRouter router = GoRouter(
-  initialLocation: '/',
-  redirect: (BuildContext context, GoRouterState state) async {
-    final authServices = Provider.of<StateServices>(context, listen: false);
-    final isLogin = authServices.isLoading;
-    final isLoginScreen = state.path == '/login';
+GoRouter crearRouter(BuildContext context) {
+  final authServices = Provider.of<StateServices>(context, listen: false);
 
-    if(!isLogin && !isLoginScreen) {
-      return '/login';
-    } else if(isLogin && isLoginScreen) {
-      return '/';
-    }
+  return GoRouter(
+    initialLocation: '/',
+    refreshListenable: authServices,
 
-    return null;
-  },
-  routes: <RouteBase>[
-    GoRoute(
-      path: '/',
-      builder: (BuildContext context, GoRouterState state) {
-        return const InicioScreen();
-      },
-    ),
-    GoRoute(
-      path: '/login',
-      builder: (BuildContext context, GoRouterState state) {
-        return LoginApp();
+    redirect: (BuildContext context, GoRouterState state) {
+      if (!authServices.isInitialized) return null;
+
+      final bool logueado = authServices.isAuthenticated;
+      final bool enPantallaLogin = state.matchedLocation == '/login';
+
+      if (!logueado && !enPantallaLogin) {
+        return '/login';
       }
-    )
-  ]
-);
+
+      if (logueado && enPantallaLogin) {
+        return '/';
+      }
+
+      return null;
+    },
+    routes: <RouteBase>[
+      GoRoute(
+        path: '/',
+        builder: (BuildContext context, GoRouterState state) => const InicioScreen(),
+      ),
+      GoRoute(
+        path: '/login',
+        builder: (BuildContext context, GoRouterState state) => LoginApp(),
+      )
+    ],
+  );
+}
