@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inversiones_ar/dbModels/dbModels.dart';
+import 'package:inversiones_ar/features/providers/authProvider.dart';
 import 'package:inversiones_ar/requestHttp/requestHttp.dart';
 import 'package:inversiones_ar/services/servicesPrinter.dart';
 import 'package:inversiones_ar/helpers/formatters.dart' as helpers;
 import 'package:internet_connection_checker/internet_connection_checker.dart';
 import 'dart:async';
 import 'package:intl/intl.dart';
+import 'package:inversiones_ar/widgets/ToatsSnackBar.dart';
 import 'package:inversiones_ar/widgets/overlayCircle.dart';
 import 'package:inversiones_ar/helpers/formatters.dart';
 
@@ -30,16 +32,32 @@ class _VentasScreenState extends ConsumerState<VentasScreen> {
 
   bool isLoading = true;
 
+  final TextEditingController fechaDesdeController = TextEditingController();
+  final TextEditingController fechaHastaController = TextEditingController();
+
   Future<void> getVentasRegistradas() async  {
     try {
       LoadingOverlay.show(context, message: 'Cargando ventas...');
-      final ventas = await getVentas();
+      final ventas = await getVentas({
+        "desde": fechaDesdeController.text.isEmpty ? null : fechaDesdeController.text,
+        "hasta": fechaHastaController.text.isEmpty ? null : fechaHastaController.text,
+        "idCaja": ref.read(authProvider).idCajaOpen,
+        "idCliente": null,
+        "idRuta": null,
+        "idAperturaCaja": ref.read(authProvider).idAperturaCaja,
+      });
       LoadingOverlay.hide();
 
       setState(() {
         _ventasLocales = ventas;
       });
     } catch (e) {
+      LoadingOverlay.hide();
+      ToastSnackBar.show(
+        context,
+        message: 'No se pudieron obtener las ventas',
+        type: ToastType.error,
+      );
       throw Exception('Error al obtener las ventas locales: $e');
     }
   }
@@ -47,19 +65,21 @@ class _VentasScreenState extends ConsumerState<VentasScreen> {
   reImprimirFactura(int idVenta, VentaModel ventaCard, WidgetRef ref) async {
     final printerService = ref.read(printerProvider);
 
+    if(!mounted) return;
+
+
     if(printerService.isPrinting || printerService.isPrinting) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ya se está imprimiendo un ticket.'))
+      ToastSnackBar.show(
+        context,
+        message: 'Ya hay una impresión en curso',
+        type: ToastType.info,
       );
       return;
     }
 
-    if(!mounted) return;
-
     final cliente = await getClienteById(ventaCard.idCliente ?? 0);
 
     venta = ventaCard;
-
 
     // venta['idVenta'] = ventaCard.idVenta;
     // venta['noVenta'] = ventaCard.noVenta;
@@ -96,8 +116,12 @@ class _VentasScreenState extends ConsumerState<VentasScreen> {
       venta: venta,
       productos: detalleVenta,
       isCopy: true,
+      showIva: true,
       ivaPorcentaje: 15,
       tipoCambio: 36.50,
+      descuento: venta?.descuento ?? 0,
+      ivaValue: venta?.iva ?? 0,
+
     );
   }
 
@@ -149,8 +173,8 @@ class _VentasScreenState extends ConsumerState<VentasScreen> {
           return notification.depth == 0;
         },
         surfaceTintColor: Colors.white,
-        scrolledUnderElevation: 4,
-        shadowColor: Colors.grey[200],
+        // scrolledUnderElevation: 4,
+        // shadowColor: Colors.grey[200],
         centerTitle: true,
         title: isSearching
           ? TextField(
@@ -216,6 +240,106 @@ class _VentasScreenState extends ConsumerState<VentasScreen> {
       ),
       body: Column(
         children: [
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                  children: [
+                    // 1. Envolvemos el primer campo en Expanded
+                    Expanded(
+                      child: TextFormField(
+                        controller: fechaDesdeController,
+                        readOnly: true,
+                        keyboardType: TextInputType.datetime,
+                        decoration: const InputDecoration(
+                            labelText: 'Desde',
+                            labelStyle: TextStyle(color: Colors.grey),
+                            prefixIcon: Icon(Icons.calendar_month_outlined, color: Colors.grey),
+                            isDense: true,
+                            hintText: 'DD/MM/AAAA',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(12)),
+                            )
+                        ),
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                        ),
+                        cursorHeight: 25,
+                        onTap: () async {
+                          FocusScope.of(context).requestFocus(FocusNode());
+
+                          DateTime? selectedDate = await showDatePicker(
+                            context: context,
+                            initialDate: DateTime.now(),
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime(2050),
+                          );
+                          if (selectedDate != null) {
+                            String formattedDate =
+                                "${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}";
+                            print(formattedDate);
+                            fechaDesdeController.text = formattedDate;
+
+                            await getVentasRegistradas();
+                          }
+                        },
+                      ),
+                    ),
+
+                    // 2. Cambiamos height por width para separar los campos horizontalmente
+                    const SizedBox(width: 12),
+
+                    // 3. Envolvemos el segundo campo en Expanded
+                    Expanded(
+                      child: TextFormField(
+                        controller: fechaHastaController,
+                        readOnly: true,
+                        keyboardType: TextInputType.datetime,
+                        decoration: const InputDecoration(
+                            labelText: 'Hasta',
+                            labelStyle: TextStyle(color: Colors.grey),
+                            prefixIcon: Icon(Icons.calendar_month_outlined, color: Colors.grey),
+                            isDense: true,
+                            hintText: 'DD/MM/AAAA',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(12)),
+                            )
+                        ),
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                        ),
+                        cursorHeight: 25,
+                        onTap: () async {
+                          FocusScope.of(context).requestFocus(FocusNode());
+
+                          DateTime? selectedDate = await showDatePicker(
+                            context: context,
+                            initialDate: DateTime.now(),
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime.now(),
+                          );
+                          if (selectedDate != null) {
+                            String formattedDate =
+                                "${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}";
+                            fechaHastaController.text = formattedDate;
+
+                            await getVentasRegistradas();
+                          }
+                        },
+                      ),
+                    ),
+                  ]
+              ),
+            )
+          ),
+
+          const SizedBox(height: 12),
+
           Expanded(
             child: _ventasLocales.isEmpty
                 ? Center(

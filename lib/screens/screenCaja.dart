@@ -109,7 +109,9 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
   Future<void> _cargarDatos(int idCaja) async {
     try {
 
+      LoadingOverlay.show(context, message: 'Cargando datos...');
       final ResumenTotalesModel? resumen = await getResumenCajaTotales(idCaja);
+      LoadingOverlay.hide();
 
       if (!mounted) return;
       setState(() {
@@ -117,6 +119,7 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
       });
 
     } catch (e) {
+      LoadingOverlay.hide();
       if (!mounted) return;
       ToastSnackBar.show(
           context,
@@ -126,20 +129,25 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
     }
   }
 
-   Future<void> _enviarApertura(payload) async {
+   Future<void> _enviarApertura() async {
     if(!widget.isCierre) {
-      if (_listaDesglose.isEmpty || _cajaSeleccionada == null || _idUsuarioApertura == 0) {
-        print('$_listaDesglose - $_idCaja - $_idUsuarioApertura - $_cajaSeleccionada' );
+      if (_cajaSeleccionada == null || _idUsuarioApertura == 0) {
         return ToastSnackBar.show(context,
-          message: 'Debe agregar al menos una denominación y elegir una caja',
+          message: 'Debe seleccionar una caja',
           type: ToastType.warning
+        );
+      }
+    } else {
+      if(_listaDesglose.isEmpty) {
+        return ToastSnackBar.show(context,
+            message: 'Debe agregar al menos una denominación',
+            type: ToastType.warning
         );
       }
     }
 
     String msgLoader = widget.isCierre ? 'Arqueando caja' : 'Abriendo caja';
     String msgSucces = widget.isCierre ? 'Arqueo de caja exitoso' : 'Apertura de caja exitosa';
-    String goRoute = widget.isCierre ? '/caja/false' : '/';
 
     try {
       final Map<String, dynamic> data = {
@@ -165,10 +173,12 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
 
       LoadingOverlay.show(context, message: '$msgLoader ${_cajaSeleccionada?.nombre ?? ''}...');
 
+      Map<String, dynamic> response = {};
+
       if(!widget.isCierre) {
-        await postAperturaCaja(data);
+        response = await postAperturaCaja(data);
       } else {
-        await arquearCaja(arqueoCaja);
+        response = await arquearCaja(arqueoCaja);
       }
 
       LoadingOverlay.hide();
@@ -181,7 +191,7 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
       if(widget.isCierre) {
         await ref.read(authProvider.notifier).checkAuthStatus();
       } else {
-        await ref.read(authProvider.notifier).openCaja(_cajaSeleccionada!.idCaja);
+        await ref.read(authProvider.notifier).openCaja(_cajaSeleccionada!.idCaja, response['data']['idAperturaCaja']);
       }
 
     } on DioException catch (e) {
@@ -221,7 +231,7 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
 
   }
 
-  void _confirmarOpenCaja(BuildContext context, payload) async {
+  void _confirmarOpenCaja(BuildContext context) async {
     String title = widget.isCierre ? 'Arquear Caja' : 'Abrir Caja';
     String msg = widget.isCierre ? '¿Estás seguro de que deseas cerrar caja?' : '¿Estás seguro de que deseas abrir caja?';
 
@@ -236,9 +246,7 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
     );
 
     if(openCaja) {
-      await _enviarApertura(payload);
-    } else {
-      context.pop();
+      await _enviarApertura();
     }
   }
 
@@ -286,8 +294,7 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
   @override
   Widget build(BuildContext context) {
     final formKey = GlobalKey<FormState>();
-    final authState = ref.watch(authProvider);
-    String title = widget.isCierre ? 'Arqueo de Caja' : 'Apertura de Caja';
+    String title = widget.isCierre ? 'Arqueo de Caja' : '';
 
     final estiloInput = InputDecorationTheme(
       filled: true,
@@ -310,7 +317,7 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
     );
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         notificationPredicate: (ScrollNotification notification) {
@@ -318,8 +325,13 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
         },
         surfaceTintColor: Colors.white,
         scrolledUnderElevation: 4,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(16),
+            bottomRight: Radius.circular(16),
+          ),
+        ),
         shadowColor: Colors.grey[200],
-        titleSpacing: 16,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -339,11 +351,8 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
           child: SingleChildScrollView(
             // padding: !widget.isCierre ? const EdgeInsets.all(20.0) : const EdgeInsets.all(0.0),
             padding: const EdgeInsets.all(0.0),
-            child: Card(
+            child: Container(
               color: Colors.white,
-              elevation: 3,
-              shadowColor: Colors.black.withOpacity(0.15),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               child: AnimatedSize(
                 duration: const Duration(milliseconds: 300),
                 curve: Curves.easeInOut,
@@ -357,7 +366,7 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           // --- ENCABEZADO ---
-                          if(!widget.isCierre) CircleAvatar(
+                          CircleAvatar(
                             radius: 32,
                             backgroundColor: Colors.indigo.shade50,
                             child: const Icon(Icons.point_of_sale_rounded, size: 32, color: Colors.indigo),
@@ -742,7 +751,7 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
                                 SizedBox(
                                   width: double.infinity,
                                   child: TextButton(
-                                    onPressed: () => _confirmarOpenCaja(context, authState.userPayload),
+                                    onPressed: () => _confirmarOpenCaja(context),
                                     style: TextButton.styleFrom(
                                       backgroundColor: const Color(0xff1a237e),
                                       foregroundColor: Colors.white,
@@ -765,9 +774,6 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
                                         _listaDesglose.clear();
                                         _cantidadController.clear();
                                         _observacionesController.clear();
-
-
-                                        print('${widget.isCierre}, $_isFormOpen');
                                       });
                                     },
                                     style: TextButton.styleFrom(

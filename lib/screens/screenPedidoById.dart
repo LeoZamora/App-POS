@@ -82,23 +82,25 @@ class _PedidoByIdState extends ConsumerState<PedidoById> {
       LoadingOverlay.hide();
 
 
-      if(result?['code'] != 400 && result?['code'] != 404 && result?['code'] != 400.1) {
-        ToastSnackBar.show(
-          context,
-          type: ToastType.success,
-          message: 'Pedido marcado como entregado ',
-        );
+      ToastSnackBar.show(
+        context,
+        type: ToastType.success,
+        message: 'Pedido marcado como entregado ',
+      );
 
-        Navigator.pop(context);
-      } else {
-        LoadingOverlay.hide();
-        ToastSnackBar.show(
-          context,
-          type: ToastType.error,
-          message: result?['msg'] ?? 'Error al registrar la venta',
-        );
-        return;
-      }
+      Navigator.pop(context);
+      // if(result?['code'] != 400 && result?['code'] != 404 && result?['code'] != 400.1) {
+      //
+
+      // } else {
+      //   LoadingOverlay.hide();
+      //   ToastSnackBar.show(
+      //     context,
+      //     type: ToastType.error,
+      //     message: result?['msg'] ?? 'Error al registrar la venta',
+      //   );
+      //   return;
+      // }
     } catch (e){
       LoadingOverlay.hide();
 
@@ -123,8 +125,6 @@ class _PedidoByIdState extends ConsumerState<PedidoById> {
 
     if(valid) {
       await marcarPedidoEntregado();
-    } else {
-      Navigator.pop(context);
     }
   }
 

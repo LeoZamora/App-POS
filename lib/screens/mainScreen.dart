@@ -17,6 +17,7 @@ import 'package:go_router/go_router.dart';
 import 'package:inversiones_ar/routesApp/appRouter.dart';
 import 'package:inversiones_ar/widgets/ToatsSnackBar.dart';
 import 'package:inversiones_ar/widgets/alertReusable.dart';
+import 'package:inversiones_ar/widgets/overlayCircle.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 
 
@@ -36,32 +37,40 @@ class _InicioScreenState extends ConsumerState<InicioScreen> with RouteAware {
   bool isLoading = false;
   late StreamSubscription<InternetConnectionStatus> _connectionStatus;
 
-  Map<String, dynamic>? _resumenCaja;
+  AperturaCajaModel? _resumenCaja;
+  ResumenTotalesModel? _resumenTotales;
 
   List<Map<dynamic, dynamic>> menuCards = [
     {
       "title": 'Ventas',
       "icon": Icons.shopping_cart_outlined,
       "widget": VentasScreen(),
+      "exclude": false,
       "requiredPer": 32,
     },
     {
       "title": 'Registrar Pedido',
       "icon": Icons.drive_file_rename_outline_outlined,
       "widget": RegistroPedido(),
+      "exclude": false,
       "requiredPer": 142
+      // "requiredPer": 32,
     },
     {
       "title": 'Entregar Pedido',
       "icon": Icons.receipt_long,
+      "exclude": false,
       "widget": PedidosScreen(),
       "requiredPer": 147
+      // "requiredPer": 32,
     },
     {
       "title": 'Retirar Efectivo',
       "icon": Icons.receipt_long,
+      "exclude": true,
       "widget": EgresosCapitalScreen(),
       "requiredPer": 147
+      // "requiredPer": 32,
     }
   ];
 
@@ -76,8 +85,8 @@ class _InicioScreenState extends ConsumerState<InicioScreen> with RouteAware {
       message: '¿Estás seguro de que deseas hacer realizar el arqueo?',
       yesText: 'Si',
       noText: 'NO',
-      icon: Icons.logout_rounded,
-      primaryColor: Colors.red,
+      icon: Icons.calculate_outlined,
+      primaryColor: Colors.indigo,
     );
 
     if(closeCaja) {
@@ -85,6 +94,27 @@ class _InicioScreenState extends ConsumerState<InicioScreen> with RouteAware {
       context.push('/caja/true');
     } else {
       context.pop();
+    }
+  }
+
+  void _confirmCerrarSesion(BuildContext context) async {
+    final closeCaja = await AlertReusable.show(
+      context,
+      title: "Cerrar Sesión",
+      message: '¿Estás seguro de que deseas cerrar la sesión?',
+      yesText: 'Si',
+      noText: 'NO',
+      icon: Icons.logout_rounded,
+      primaryColor: Colors.red,
+    );
+
+    if(closeCaja) {
+      LoadingOverlay.show(
+        context,
+        message: 'Cerrando sesión...',
+      );
+      await ref.read(authProvider.notifier).logout();
+      LoadingOverlay.hide();
     }
   }
 
@@ -101,29 +131,27 @@ class _InicioScreenState extends ConsumerState<InicioScreen> with RouteAware {
   }
 
 
-
   Future<void> resumenCaja(int idCaja) async {
     try {
       setState(() => isLoading = true);
       final result = await Future.wait([
-        getResumenCaja(idCaja),
-        getResumenCajaTotales(idCaja)
+        getAperturaCaja(idCaja),
+        getResumenCajaTotales(idCaja),
+        ref.read(authProvider.notifier).checkAuthStatus(),
       ]);
 
       if (!mounted) return;
 
       setState(() => isLoading = false);
 
-      final ResumenCajaModel response = result[0] as ResumenCajaModel;
+      final AperturaCajaModel response = result[0] as AperturaCajaModel;
       final ResumenTotalesModel response2 = result[1] as ResumenTotalesModel;
 
       setState(() {
-        _resumenCaja = {
-          ...response.toMap(),
-          ...response2.toMap(),
-        };
+        _resumenCaja = response;
+        _resumenTotales = response2;
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
       if (!mounted) return;
 
       setState(() => isLoading = false);
@@ -202,7 +230,7 @@ class _InicioScreenState extends ConsumerState<InicioScreen> with RouteAware {
     final cardsPermitidas = menuCards.where((item) {
       final int codigoPermiso = item['requiredPer'];
 
-      return authState.existePermission(codigoPermiso);
+      return authState.existePermission(codigoPermiso) || item['exclude'] == true;
     }).toList();
 
     return Scaffold(
@@ -236,7 +264,7 @@ class _InicioScreenState extends ConsumerState<InicioScreen> with RouteAware {
                         shape: const RoundedRectangleBorder(
                           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
                         ),
-                        builder: (context) => UserBottomSheet(onPressed: _confirmCloseCaja),
+                        builder: (context) => UserBottomSheet(onPressed: _confirmCerrarSesion),
                       );
                     },
                   ),
@@ -263,16 +291,8 @@ class _InicioScreenState extends ConsumerState<InicioScreen> with RouteAware {
                             width: double.infinity,
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: Colors.indigo[800],
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment(0.4, 0.6),
-                                colors: <Color>[
-                                  Color(0xffe65100),
-                                  Color(0xff1a237e),
-                                ],
-                                tileMode: TileMode.mirror,
-                              ),
+                              color: Color(0xff1a237e),
+                              backgroundBlendMode: BlendMode.darken,
                               borderRadius: BorderRadius.circular(15),
                               border: Border.all(color: Colors.grey[200]!, width: 1),
                               boxShadow: [
@@ -286,30 +306,37 @@ class _InicioScreenState extends ConsumerState<InicioScreen> with RouteAware {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Row(
-                                      children: [
-                                        Text(
-                                          'Resumen de ',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            color: Colors.white,
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          const Text(
+                                            'Resumen de ',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              color: Colors.white,
+                                            ),
                                           ),
-                                        ),
-                                        Text(
-                                          '${_resumenCaja?['cajaNombre'] ?? 'Totales'}'.toUpperCase(),
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white,
+                                          Expanded(
+                                            child: Text(
+                                              (_resumenCaja?.cajaNombre ?? 'Totales').toUpperCase(),
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                              maxLines: 1,
+                                              softWrap: false,
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
-                                    Icon(Icons.account_balance_wallet, color: Colors.white, size: 22),
+                                    const SizedBox(width: 8),
+                                    const Icon(Icons.account_balance_wallet, color: Colors.white, size: 22),
                                   ],
                                 ),
 
@@ -327,7 +354,7 @@ class _InicioScreenState extends ConsumerState<InicioScreen> with RouteAware {
                                     ),
 
                                     !isLoading ? Text(
-                                      'C\$ ${formattedNumber((_resumenCaja?['totalPedidos'] ?? 0).toDouble())}',
+                                      'C\$ ${formattedNumber((_resumenTotales?.totalPedidos ?? 0).toDouble())}',
                                       style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
                                     ) : LoadingAnimationWidget.waveDots(
                                         color: Colors.white,
@@ -338,16 +365,35 @@ class _InicioScreenState extends ConsumerState<InicioScreen> with RouteAware {
 
                                 if (authState.existePermission(32)) const SizedBox(height: 5),
 
+                                // if (authState.existePermission(32)) Row(
+                                //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                //   children: [
+                                //     const Text(
+                                //       'Valor Mercaderia:',
+                                //       style: TextStyle(color: Colors.white70, fontSize: 15),
+                                //     ),
+                                //
+                                //     !isLoading ? Text(
+                                //       'C\$ ${formattedNumber((_resumenTotales?.totalMercaderia ?? 0).toDouble())}',
+                                //       style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+                                //     ) : LoadingAnimationWidget.waveDots(
+                                //         color: Colors.white,
+                                //         size: 20
+                                //     ),
+                                //   ],
+                                // ),
+
+                                if (authState.existePermission(32)) const SizedBox(height: 5),
+
                                 if (authState.existePermission(32)) Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     const Text(
-                                      'Valor Mercaderia:',
+                                      'Total Egresos:',
                                       style: TextStyle(color: Colors.white70, fontSize: 15),
                                     ),
-
                                     !isLoading ? Text(
-                                      'C\$ ${formattedNumber((_resumenCaja?['totalMercaderia'] ?? 0).toDouble())}',
+                                      'C\$ ${formattedNumber((_resumenTotales?.totalRetiros ?? 0).toDouble())}',
                                       style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
                                     ) : LoadingAnimationWidget.waveDots(
                                         color: Colors.white,
@@ -366,7 +412,7 @@ class _InicioScreenState extends ConsumerState<InicioScreen> with RouteAware {
                                       style: TextStyle(color: Colors.white70, fontSize: 15),
                                     ),
                                     !isLoading ? Text(
-                                      'C\$ ${formattedNumber((_resumenCaja?['efectivoApertura'] ?? 0).toDouble())}',
+                                      'C\$ ${formattedNumber((_resumenTotales?.efectivoApertura ?? 0).toDouble())}',
                                       style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
                                     ) : LoadingAnimationWidget.waveDots(
                                         color: Colors.white,
@@ -385,7 +431,7 @@ class _InicioScreenState extends ConsumerState<InicioScreen> with RouteAware {
                                       style: TextStyle(color: Colors.white70, fontSize: 15),
                                     ),
                                     !isLoading ? Text(
-                                      'C\$ ${formattedNumber((_resumenCaja?['totalVentas'] ?? 0).toDouble())}',
+                                      'C\$ ${formattedNumber((_resumenTotales?.totalVentas ?? 0).toDouble())}',
                                       style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
                                     ) : LoadingAnimationWidget.waveDots(
                                         color: Colors.white,
@@ -418,7 +464,7 @@ class _InicioScreenState extends ConsumerState<InicioScreen> with RouteAware {
                                           ),
                                         ),
                                         !isLoading ? Text(
-                                          'C\$ ${formattedNumber((_resumenCaja?['totalEnCaja'] ?? 0).toDouble())}',
+                                          'C\$ ${formattedNumber((_resumenTotales?.totalEnCaja ?? 0).toDouble())}',
                                           style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w500),
                                         ) : LoadingAnimationWidget.waveDots(
                                             color: Colors.white,
@@ -469,8 +515,8 @@ class _InicioScreenState extends ConsumerState<InicioScreen> with RouteAware {
                                     borderRadius: BorderRadius.circular(20),
                                     clipBehavior: Clip.antiAlias, // Evita que el toque se salga de los bordes curvos
                                     child: InkWell(
-                                      splashColor: cardColor.withOpacity(0.1), // El toque toma el color de tu tema
-                                      highlightColor: cardColor.withOpacity(0.05),
+                                      splashColor: Colors.indigo[100], // El toque toma el color de tu tema
+                                      highlightColor: Colors.indigo[100],
                                       onTap: () {
                                         if (item.containsKey("widget") && item["widget"] != null) {
                                           Navigator.push(
@@ -540,7 +586,7 @@ class _InicioScreenState extends ConsumerState<InicioScreen> with RouteAware {
           );
         },
         tooltip: 'Registrar Ventas',
-        backgroundColor: Color(0xff1a237e),
+        backgroundColor: const Color(0xffe65100),
         foregroundColor: Colors.white,
         elevation: 4,
         shape: const CircleBorder(),
@@ -548,6 +594,7 @@ class _InicioScreenState extends ConsumerState<InicioScreen> with RouteAware {
       ) : null,
 
       bottomNavigationBar: DemoBottomAppBar(
+        onPressed: _confirmCloseCaja,
         fabLocation: _fabLocation,
         shape: const CircularNotchedRectangle(),
         isConnected: isConnected,
@@ -564,6 +611,7 @@ class DemoBottomAppBar extends ConsumerStatefulWidget {
   final NotchedShape shape;
   final bool isConnected;
   final VoidCallback onPressedLogout;
+  final void Function(BuildContext) onPressed;
 
   const DemoBottomAppBar({
     super.key,
@@ -571,6 +619,7 @@ class DemoBottomAppBar extends ConsumerStatefulWidget {
     required this.shape,
     required this.isConnected,
     required this.onPressedLogout,
+    required this.onPressed,
   });
 
   @override
@@ -606,6 +655,15 @@ class _DemoBottomAppBarState extends ConsumerState<DemoBottomAppBar> {
               color: printerService.selectedDeviceAddress != null ? Colors.indigo : Colors.grey[600],
             ),
             tooltip: "Impresoras",
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            onPressed: () => widget.onPressed(context),
+            icon: Icon(
+              Icons.point_of_sale_rounded,
+              color: printerService.selectedDeviceAddress != null ? Colors.indigo : Colors.grey[600],
+            ),
+            tooltip: "Arquear Caja",
           ),
         ],
       ),
@@ -663,10 +721,10 @@ class UserBottomSheet extends ConsumerWidget {
               child: ElevatedButton.icon(
                 onPressed: () => onPressed(context),
                 icon: const Icon(Icons.logout_rounded),
-                label: const Text('Arquear Caja', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                label: const Text('Cerrar Sesión', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.indigo[50],
-                  foregroundColor: Colors.indigo[700],
+                  backgroundColor: Colors.red[50],
+                  foregroundColor: Colors.red[700],
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

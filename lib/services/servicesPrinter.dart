@@ -46,8 +46,12 @@ class PrinterService with ChangeNotifier {
     required List<Map<String, dynamic>> productos,
     bool isCopy = false,
     bool? showIva = false,
+    ivaValue = 0,
     double ivaPorcentaje = 15,
     double tipoCambio = 36.50,
+    double pagaCon = 0.0,
+    double cambio = 0.0,
+    double descuento = 0.0
   }) {
     final buffer = StringBuffer();
 
@@ -55,11 +59,10 @@ class PrinterService with ChangeNotifier {
     for (var p in productos) {
       subtotal += p['cantidad'] * p['precioUnitario'];
     }
-    double iva = subtotal * (ivaPorcentaje / 100);
-    double total = (showIva ?? false) ? subtotal + iva : subtotal;
+    double total = (subtotal - descuento) + ivaValue;
 
     buffer.writeln("        Migdalia's Market       ".toString());
-    buffer.writeln('       Tel: +505 8652-6458       '.toString());
+    buffer.writeln('       Tel: +505 2263-2783       '.toString());
     buffer.writeln('Ticket No:            ${venta?.noVenta.toString().padLeft(5, '0')}');
     buffer.writeln('Credito:                      ${venta?.credito == true ? 'SI' : 'NO'}');
     buffer.writeln('Cliente : ${venta?.cliente.toString().padLeft(20)}');
@@ -89,16 +92,21 @@ class PrinterService with ChangeNotifier {
 
     buffer.writeln('');
     buffer.writeln('SUBTOTAL    :        ${symbolCor + formattedNumber(subtotal).padLeft(8)}');
-    if (showIva ?? false) {
-    buffer.writeln('IVA ($ivaPorcentaje%) :        ${symbolCor + iva.toStringAsFixed(2).padLeft(8)}');
-    }
+    buffer.writeln('IVA ($ivaPorcentaje%) :        ${symbolCor + ivaValue.toStringAsFixed(2).padLeft(8)}');
+    buffer.writeln('DESCUENTO    :        ${symbolCor + formattedNumber(descuento).padLeft(8)}');
     buffer.writeln('TOTAL       :        ${symbolCor + formattedNumber(total).padLeft(8)}');
     // buffer.writeln('TOTAL       :        ${symbolDolar + formattedNumber((total / tipoCambio)).padLeft(9)}');
     // buffer.writeln('Tipo Cambio :        ${symbolCor + tipoCambio.toStringAsFixed(2).padLeft(8)}');
 
     buffer.writeln('');
+
+    buffer.writeln('-------------------------------');
+    buffer.writeln('PAGA CON    :        ${symbolCor + formattedNumber(pagaCon).padLeft(8)}');
+    buffer.writeln('CAMBIO      :        ${symbolCor + formattedNumber(cambio).padLeft(8)}');
+
+    buffer.writeln('');
     buffer.writeln('|   !Gracias por su compra!   |');
-    buffer.writeln('|   Ante cualquier duda  o    |\n|   consulta, comunicarse a   |\n|       +505 8652-6458        |');
+    buffer.writeln('|   Ante cualquier duda  o    |\n|   consulta, comunicarse a   |\n|       +505 2263-2783        |');
     buffer.writeln('|                             |');
     buffer.writeln('|            ${isCopy ? 'COPIA' : '     '}            |');
 
@@ -253,9 +261,14 @@ class PrinterService with ChangeNotifier {
 
   Future<void> showDeviceSelectionDialog(BuildContext context) async {
     await getPairedDevices(context);
-    if (!Navigator.of(context).mounted) return;
+    if (!context.mounted) return;
 
-    showDialog(
+    // Antes: el onTap conectaba y cerraba el diálogo sin esperar la
+    // conexión, así que este Future se resolvía antes de que
+    // _selectedDeviceAddress realmente se actualizara. Ahora: el diálogo
+    // solo devuelve la dirección elegida (Navigator.pop(address)), y
+    // conectamos DESPUÉS, aquí abajo, con await.
+    final String? selectedAddress = await showDialog<String>(
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
@@ -265,7 +278,7 @@ class PrinterService with ChangeNotifier {
             width: double.maxFinite,
             height: 300,
             child: _pairedDevices.isEmpty
-                ? Text(
+                ? const Text(
                 "No hay impresoras vinculadas. \nAsegúrate de vincular tu impresora en los ajustes de Bluetooth del dispositivo.")
                 : ListView.builder(
               shrinkWrap: true,
@@ -274,12 +287,15 @@ class PrinterService with ChangeNotifier {
                 final device = _pairedDevices[index];
                 return ListTile(
                   title: Text(device["name"] ?? "Dispositivo desconocido"),
-                  textColor: selectedDeviceAddress == device["address"] ? Colors.indigo : Colors.black,
+                  textColor: selectedDeviceAddress == device["address"]
+                      ? Colors.indigo
+                      : Colors.black,
                   subtitle: Text(device["address"] ?? ""),
                   dense: true,
                   onTap: () {
-                    Navigator.of(dialogContext).pop();
-                    connectToDevice(context, device["address"]!);
+                    // Solo devolvemos la dirección elegida; ya NO
+                    // conectamos aquí dentro.
+                    Navigator.of(dialogContext).pop(device["address"]);
                   },
                   leading: GestureDetector(
                     onTap: () {
@@ -288,13 +304,17 @@ class PrinterService with ChangeNotifier {
                     },
                     child: Icon(
                       Icons.print_disabled_outlined,
-                      color: selectedDeviceAddress == device['address'] ? Colors.red : Colors.transparent,
+                      color: selectedDeviceAddress == device['address']
+                          ? Colors.red
+                          : Colors.transparent,
                       size: 20.0,
-                    )
+                    ),
                   ),
                   trailing: Icon(
                     Icons.check_circle_outline,
-                    color: selectedDeviceAddress == device['address'] ? Colors.indigo : Colors.transparent,
+                    color: selectedDeviceAddress == device['address']
+                        ? Colors.indigo
+                        : Colors.transparent,
                   ),
                 );
               },
@@ -303,14 +323,20 @@ class PrinterService with ChangeNotifier {
           actions: <Widget>[
             TextButton(
               onPressed: () {
-                Navigator.of(dialogContext).pop();
+                Navigator.of(dialogContext).pop(); // cancelar -> null
               },
               child: const Text("Cancelar"),
             )
           ],
         );
-      }
+      },
     );
+
+    // Ahora sí: showDeviceSelectionDialog() no se considera "terminado"
+    // hasta que la conexión real haya sucedido (o fallado).
+    if (selectedAddress != null && context.mounted) {
+      await connectToDevice(context, selectedAddress);
+    }
   }
 
 
@@ -321,7 +347,11 @@ class PrinterService with ChangeNotifier {
     bool isCopy = false,
     bool? showIva = false,
     double ivaPorcentaje = 15,
+    double ivaValue = 0,
     double tipoCambio = 36.50,
+    double descuento = 0.0,
+    double pagaCon = 0.0,
+    double cambio = 0.0,
   }) async {
     if (_selectedDeviceAddress == null) {
       ToastSnackBar.show(
@@ -346,8 +376,13 @@ class PrinterService with ChangeNotifier {
         productos: productos,
         isCopy: isCopy,
         showIva: showIva,
+        ivaValue: ivaValue,
+        descuento: descuento,
         ivaPorcentaje: ivaPorcentaje,
         tipoCambio: tipoCambio,
+        pagaCon: pagaCon,
+        cambio: cambio,
+
       );
 
       final Map<String, dynamic> printPayload = {
@@ -361,6 +396,112 @@ class PrinterService with ChangeNotifier {
       ToastSnackBar.show(
         context,
         message: 'Imprimiendo ticket...',
+        type: ToastType.success,
+        duration: const Duration(seconds: 3),
+      );
+      return true;
+    } on PlatformException catch (e) {
+      if (e.code == "NOT_CONNECTED") {
+        if (_selectedDeviceAddress != null) {
+          await connectToDevice(context, _selectedDeviceAddress!);
+          notifyListeners();
+        } else {
+          await showDeviceSelectionDialog(context);
+        }
+      }
+      return false;
+    } finally {
+      _isPrinting = false;
+      notifyListeners();
+    }
+  }
+
+
+
+//   IMPRESION DE RETIROS DE CAJA
+  String generarTextoRetiroCaja({
+    required RetiroEfectivoModel retiro,
+    bool isCopy = false,
+  }) {
+    final buffer = StringBuffer();
+
+    final String symbolCor = 'C${String.fromCharCode(36)}';
+
+    final double monto = (retiro.monto as num?)?.toDouble() ?? 0;
+
+    final String fechaCompleta = retiro.fechaRegistro?.toString() ?? '';
+    final String fecha = fechaCompleta.length >= 10 ? fechaCompleta.substring(0, 10) : '- - -';
+    final String hora = fechaCompleta.length >= 16 ? fechaCompleta.substring(11, 16) : '';
+
+    final String observaciones = (retiro.observaciones)?.trim() ?? '';
+    final String noRetiro = (retiro.idRetiroCaja ?? '').toString().padLeft(5, '0');
+
+    buffer.writeln("        Migdalia's Market       ");
+    buffer.writeln('       Tel: +505 2263-2783       ');
+    buffer.writeln('');
+    buffer.writeln('     COMPROBANTE DE RETIRO       ');
+    buffer.writeln('-------------------------------');
+    buffer.writeln('No. Retiro :          $noRetiro');
+    buffer.writeln('Apertura   :  ${retiro.aperturaCodigo ?? '- - -'}');
+    buffer.writeln('Concepto   :  ${retiro.conceptoNombre ?? '- - -'}');
+    buffer.writeln('Fecha      :  $fecha  $hora');
+    buffer.writeln('Usuario    :  ${retiro.usuarioRegistro ?? '- - -'}');
+    buffer.writeln('-------------------------------');
+    buffer.writeln('');
+    buffer.writeln('Observaciones:');
+    buffer.writeln(observaciones.isNotEmpty ? observaciones : '- - -');
+    buffer.writeln('');
+    buffer.writeln('-------------------------------');
+    buffer.writeln('MONTO RETIRADO:');
+    buffer.writeln('        $symbolCor ${formattedNumber(monto)}');
+    buffer.writeln('');
+    buffer.writeln('Firma: ________________________');
+    buffer.writeln('');
+    buffer.writeln('|            ${isCopy ? 'COPIA' : '     '}            |');
+
+    return buffer.toString();
+  }
+
+
+  Future<bool> imprimirRetiroCaja({
+    required BuildContext context,
+    required RetiroEfectivoModel retiro,
+    bool isCopy = false,
+  }) async {
+    print('SELECTED DEVICE ADDRESS: $_selectedDeviceAddress');
+    if (_selectedDeviceAddress == null) {
+      ToastSnackBar.show(
+        context,
+        message: 'Por favor, selecciona y conecta una impresora primero.',
+        type: ToastType.warning,
+      );
+      await showDeviceSelectionDialog(context);
+      if (_selectedDeviceAddress == null) return false;
+    }
+
+    if (_isPrinting) return false;
+    _isPrinting = true;
+    notifyListeners();
+
+    try {
+      Uint8List? logoBytes = await _loadLogoBytes();
+
+      final String textoRetiro = generarTextoRetiroCaja(
+        retiro: retiro,
+        isCopy: isCopy,
+      );
+
+      final Map<String, dynamic> printPayload = {
+        "text": textoRetiro,
+        "logo": logoBytes,
+        "result": _selectedDeviceAddress,
+      };
+
+      final String? result = await platform.invokeMethod("printFactura", printPayload);
+
+      ToastSnackBar.show(
+        context,
+        message: 'Imprimiendo comprobante de retiro...',
         type: ToastType.success,
         duration: const Duration(seconds: 3),
       );

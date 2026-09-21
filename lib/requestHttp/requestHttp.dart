@@ -26,18 +26,20 @@ Future<Response> postLogin(Map<String, String> data) async {
   }
 }
 
-Future<List<VentaModel>> getVentas() async {
-  final String urlApi = '/venta/lista';
+Future<List<VentaModel>> getVentas(Map<String, dynamic> body) async {
+  final String urlApi = '/Venta/lista';
   final DateTime hoy = DateTime.now();
 
   final DateFormat formatter = DateFormat('yyyy-MM-dd');
 
   try {
     final response = await apiClient.post(urlApi, data: {
-      // "desde": formatter.format(hoy),
-      // "hasta": formatter.format(hoy),
-      "idCliente": null,
-      "idRuta": null
+      "desde": body["desde"],
+      "hasta": body["hasta"],
+      "idCaja": body["idCaja"],
+      "idCliente": body["idCliente"],
+      "idRuta": body["idRuta"],
+      "idAperturaCaja": body["idAperturaCaja"],
     });
     List<dynamic> responseBody = response.data;
     List<VentaModel> ventas = responseBody
@@ -45,7 +47,9 @@ Future<List<VentaModel>> getVentas() async {
     return ventas;
   } on DioException catch (e) {
     rethrow;
-  } catch (e) {
+  } catch (e, stackTrace) {
+    print('ERROR AL OBTENER VENTAS: $e');
+    print('STACK TRACE: $stackTrace');
     throw Exception('Ocurrió un error inesperado al obtener las ventas.');
   }
 }
@@ -125,7 +129,7 @@ Future<List<DetalleVentaModel>> getVentaById(int idVenta) async {
 }
 
 Future<List<ProductoModel>> getProducts(int idSubCategoria) async {
-  final String urlApi = '/Producto?idSubCategoria=$idSubCategoria';
+  final String urlApi = '/Producto/sesion-caja/listado?idSubCategoria=$idSubCategoria';
   try {
     final response = await apiClient.get(urlApi);
     final List<dynamic> responseBody = response.data as List<dynamic>;
@@ -166,36 +170,66 @@ Future<Map<String, dynamic>?> postVentas(Map<String, dynamic> data, bool ventaRa
   final String urlApi = !ventaRapida ? '/v2/venta' : '/v2/ventas/ventas-rapidas';
 
   try {
-    final response = await apiClient.post(urlApi,
+    final response = await apiClient.post(
+      urlApi,
       options: Options(
         headers: <String, String>{
           'Content-Type': 'application/json',
         },
       ),
-      data: json.encode(data)
+      data: json.encode(data),
     );
 
-    // String responseBody = response.data as String;
-
     final dynamic body = response.data;
+    print('RESPONSE RAW BODY: $body'); // deja este print por ahora para ver qué manda cada endpoint
 
-    final Map<String, dynamic> parsedBody = body is String
-        ? json.decode(body) as Map<String, dynamic>
-        : body as Map<String, dynamic>;
+    Map<String, dynamic> parsedBody;
+
+    if (body is Map<String, dynamic>) {
+      parsedBody = body;
+    } else if (body is String && body.trim().isNotEmpty) {
+      try {
+        final decoded = json.decode(body);
+        parsedBody = decoded is Map<String, dynamic>
+            ? decoded
+            : {'msg': decoded.toString()};
+      } catch (_) {
+        // El backend no devolvió JSON válido para este endpoint
+        // (texto plano, sin comillas, etc.) -> usamos el texto tal cual
+        // como mensaje, en vez de tronar con FormatException.
+        parsedBody = {'msg': body};
+      }
+    } else {
+      // Body vacío o de otro tipo -> no hay mensaje específico del
+      // backend, pero la venta ya se registró (status 2xx), no debe
+      // fallar por esto.
+      parsedBody = {};
+    }
 
     return {
       "code": response.statusCode,
-      "msg": parsedBody['msg'] ?? parsedBody['message'] ?? '',
+      "msg": parsedBody['msg'] ?? parsedBody['message'] ?? 'Venta registrada correctamente',
       ...parsedBody,
     };
-
   } on DioException catch (e) {
-    // rethrow;
     if (e.response != null && e.response?.data != null) {
       final dynamic errorBody = e.response!.data;
-      final Map<String, dynamic> parsedError = errorBody is String
-          ? (json.decode(errorBody) as Map<String, dynamic>)
-          : errorBody as Map<String, dynamic>;
+
+      Map<String, dynamic> parsedError;
+      if (errorBody is Map<String, dynamic>) {
+        parsedError = errorBody;
+      } else if (errorBody is String && errorBody.trim().isNotEmpty) {
+        try {
+          final decoded = json.decode(errorBody);
+          parsedError = decoded is Map<String, dynamic>
+              ? decoded
+              : {'msg': decoded.toString()};
+        } catch (_) {
+          parsedError = {'msg': errorBody};
+        }
+      } else {
+        parsedError = {};
+      }
 
       return {
         "code": parsedError['code'] ?? e.response?.statusCode,
@@ -204,10 +238,64 @@ Future<Map<String, dynamic>?> postVentas(Map<String, dynamic> data, bool ventaRa
             'Error al registrar la venta',
       };
     }
-  } catch (e) {
-    throw Exception('Ocurrió un error inesperado al registrar la venta.');
+
+    // Sin response (timeout, sin conexión, DNS, etc.): sí es un error
+    // real de red, lo dejamos propagar al catch genérico de afuera.
+    rethrow;
+  } catch (e, stackTrace) {
+    print('Stack trace: $stackTrace');
+    throw Exception('Ocurrió un error inesperado al registrar la venta. $e');
   }
 }
+
+
+// Future<Map<String, dynamic>?> postVentas(Map<String, dynamic> data, bool ventaRapida) async {
+//   final String urlApi = !ventaRapida ? '/v2/venta' : '/v2/ventas/ventas-rapidas';
+//
+//   try {
+//     final response = await apiClient.post(urlApi,
+//       options: Options(
+//         headers: <String, String>{
+//           'Content-Type': 'application/json',
+//         },
+//       ),
+//       data: json.encode(data)
+//     );
+//
+//     // String responseBody = response.data as String;
+//
+//     final dynamic body = response.data;
+//
+//     final Map<String, dynamic> parsedBody = body is String
+//         ? json.decode(body) as Map<String, dynamic>
+//         : body as Map<String, dynamic>;
+//
+//     return {
+//       "code": response.statusCode,
+//       "msg": parsedBody['msg'] ?? parsedBody['message'] ?? '',
+//       ...parsedBody,
+//     };
+//
+//   } on DioException catch (e) {
+//     // rethrow;
+//     if (e.response != null && e.response?.data != null) {
+//       final dynamic errorBody = e.response!.data;
+//       final Map<String, dynamic> parsedError = errorBody is String
+//           ? (json.decode(errorBody) as Map<String, dynamic>)
+//           : errorBody as Map<String, dynamic>;
+//
+//       return {
+//         "code": parsedError['code'] ?? e.response?.statusCode,
+//         "msg": parsedError['msg'] ??
+//             parsedError['message'] ??
+//             'Error al registrar la venta',
+//       };
+//     }
+//   } catch (e, stackTrace) {
+//     print('Stack trace: $stackTrace');
+//     throw Exception('Ocurrió un error inesperado al registrar la venta. $e');
+//   }
+// }
 
 // Future<Map<String, dynamic>?> postVentas(Map<String, dynamic> data, bool ventaRapida) async {
 //   final String urlApi = !ventaRapida ? 'Venta' : 'v2/ventas/ventas-rapidas';
@@ -566,8 +654,8 @@ Future<List<GenericModelCombobox>> getConceptosCombobox() async {
   }
 }
 
-Future<List<RetiroEfectivoModel>> getRetirosEfectivo(int idCaja) async {
-  final String url = '/retiros-caja';
+Future<List<RetiroEfectivoModel>> getRetirosEfectivo(int idApertura) async {
+  final String url = '/retiros-caja?idAperturaCaja=$idApertura';
 
   try {
     final response = await apiClient.get(url);
@@ -579,6 +667,22 @@ Future<List<RetiroEfectivoModel>> getRetirosEfectivo(int idCaja) async {
     }).toList();
 
     return retiros;
+  } on DioException catch (e) {
+    rethrow;
+  } catch (e) {
+    throw Exception('Error al procesar las cajas autorizadas: $e');
+  }
+}
+
+Future<RetiroEfectivoModel> getRetirosEfectivoById(int idRetiroCaja) async {
+  final String url = '/retiros-caja/$idRetiroCaja';
+
+  try {
+    final response = await apiClient.get(url);
+
+    final RetiroEfectivoModel retiro = RetiroEfectivoModel.fromMap(response.data as Map<String, dynamic>);
+
+    return retiro;
   } on DioException catch (e) {
     rethrow;
   } catch (e) {

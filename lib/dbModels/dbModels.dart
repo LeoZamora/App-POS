@@ -677,6 +677,49 @@ class PreciosMayoristas {
   }
 }
 
+
+// IMPUESTOS
+class ProductoImpuestoModel {
+  int? idProductoImpuesto;
+  int? idImpuesto;
+  String? impuesto;
+  double? valorPorcentual;
+  bool? esAplicadoCompra;
+  bool? esAplicadoVenta;
+
+  ProductoImpuestoModel({
+    this.idProductoImpuesto,
+    this.idImpuesto,
+    this.impuesto,
+    this.valorPorcentual,
+    this.esAplicadoCompra,
+    this.esAplicadoVenta,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'idProductoImpuesto': idProductoImpuesto,
+      'idImpuesto': idImpuesto,
+      'impuesto': impuesto,
+      'valorPorcentual': valorPorcentual,
+      'esAplicadoCompra': esAplicadoCompra,
+      'esAplicadoVenta': esAplicadoVenta,
+    };
+  }
+
+  factory ProductoImpuestoModel.fromMap(Map<String, dynamic> map) {
+    return ProductoImpuestoModel(
+      idProductoImpuesto: map['idProductoImpuesto'],
+      idImpuesto: map['idImpuesto'],
+      impuesto: map['impuesto'],
+      valorPorcentual: map['valorPorcentual'],
+      esAplicadoCompra: map['esAplicadoCompra'],
+      esAplicadoVenta: map['esAplicadoVenta'],
+    );
+  }
+}
+
+
 class ProductoModel {
   int? idProducto;
   int? idSubCatProd;
@@ -693,7 +736,11 @@ class ProductoModel {
   String? tipoProducto;
   String? fechaRegistro;
   String? usuarioRegistro;
+  int? preciosMayoristasCount;
   bool? estado;
+  double? cantidadDescuento;
+  int? impuestosCount;
+  List<ProductoImpuestoModel>? impuestos;
   List<PreciosMayoristas>? precioMayorista;
 
   ProductoModel({
@@ -709,11 +756,15 @@ class ProductoModel {
     required this.esMayorista,
     this.imagen,
     this.observaciones,
+    this.cantidadDescuento,
     this.tipoProducto,
     this.fechaRegistro,
     this.usuarioRegistro,
     this.estado,
     this.precioMayorista,
+    this.preciosMayoristasCount,
+    this.impuestosCount,
+    this.impuestos,
   });
 
   Map<String, dynamic> toMap() {
@@ -725,6 +776,7 @@ class ProductoModel {
       'nombre': nombre,
       'precio': precio,
       'costo': costo,
+      'cantidadDescuento': cantidadDescuento,
       'cantidadTotal': cantidadTotal,
       'cantidadMinima': cantidadMinima,
       'esMayorista': esMayorista,
@@ -734,7 +786,10 @@ class ProductoModel {
       'fechaRegistro': fechaRegistro,
       'usuarioRegistro': usuarioRegistro,
       'estado': estado,
+      'impuestosCount': impuestosCount,
+      'preciosMayoristasCount': preciosMayoristasCount,
       'precioMayorista': precioMayorista?.map((x) => x.toMap()).toList(),
+      'impuestos': impuestos?.map((x) => x.toMap()).toList(),
     };
   }
 
@@ -746,6 +801,7 @@ class ProductoModel {
       codigo: map['codigo'],
       nombre: map['nombre'],
       precio: map['precio'],
+      cantidadDescuento: map['cantidadDescuento'],
       costo: map['costo'],
       cantidadTotal: map['cantidadTotal'],
       cantidadMinima: map['cantidadMinima'],
@@ -755,8 +811,11 @@ class ProductoModel {
       tipoProducto: map['tipoProducto'],
       fechaRegistro: map['fechaRegistro'],
       usuarioRegistro: map['usuarioRegistro'],
+      preciosMayoristasCount: map['preciosMayoristasCount'],
       estado: map['estado'] == 0 ? true : false,
       precioMayorista: map['precioMayorista'] != null ? List<PreciosMayoristas>.from(map['precioMayorista'].map((x) => PreciosMayoristas.fromMap(x))) : null,
+      impuestos: map['impuestos'] != null ? List<ProductoImpuestoModel>.from(map['impuestos'].map((x) => ProductoImpuestoModel.fromMap(x))) : null,
+      impuestosCount: map['impuestosCount'],
     );
   }
 }
@@ -900,6 +959,7 @@ class ClienteModel {
   String? fechaRegistro;
   String? usuarioRegistro;
   bool? estado;
+  bool? esTieneDescuento;
   List<DireccionesClientes>? direcciones;
 
 
@@ -913,6 +973,7 @@ class ClienteModel {
     this.municipio,
     this.personaNatural,
     this.fechaRegistro,
+    this.esTieneDescuento,
     this.usuarioRegistro,
     this.estado,
     this.direcciones,
@@ -930,6 +991,7 @@ class ClienteModel {
       'personaNatural': personaNatural,
       'fechaRegistro': fechaRegistro,
       'usuarioRegistro': usuarioRegistro,
+      'esTieneDescuento': esTieneDescuento,
       'estado': estado,
       'direcciones': direcciones?.map((x) => x.toMap()).toList(),
     };
@@ -947,7 +1009,8 @@ class ClienteModel {
       personaNatural: map['personaNatural'] == 0 ? true : false,
       fechaRegistro: map['fechaRegistro'],
       usuarioRegistro: map['usuarioRegistro'],
-      estado: map['estado'] == 0 ? true : false,
+      esTieneDescuento: map['esTieneDescuento'],
+      estado: map['estado'],
       direcciones: map['direcciones'] != null ? List<DireccionesClientes>.from(map['direcciones'].map((x) => DireccionesClientes.fromMap(x))) : null,
     );
   }
@@ -1107,9 +1170,11 @@ class VentaModel {
   String? observaciones;
   String? enviarA;
   String? ubicacion;
-  bool sincronizada;
   String? fechaRegistro;
   String? usuarioRegistro;
+  double? descuento;
+  double? iva;
+  double? subTotal;
   bool? estado;
   double? total;
 
@@ -1123,11 +1188,13 @@ class VentaModel {
     this.observaciones,
     this.enviarA,
     this.ubicacion,
-    required this.sincronizada,
     this.fechaRegistro,
     this.usuarioRegistro,
     this.estado,
     this.total,
+    this.descuento,
+    this.iva,
+    this.subTotal,
   });
 
   Map<String, dynamic> toMap() {
@@ -1141,11 +1208,13 @@ class VentaModel {
       'observaciones': observaciones,
       'enviarA': enviarA,
       'ubicacion': ubicacion,
-      'sincronizada': sincronizada,
       'fechaRegistro': fechaRegistro,
       'usuarioRegistro': usuarioRegistro,
       'estado': estado,
       'total': total,
+      'descuento': descuento,
+      'iva': iva,
+      'subTotal': subTotal,
     };
   }
 
@@ -1162,15 +1231,15 @@ class VentaModel {
       observaciones: map['observaciones']?.toString(),
       enviarA: map['enviarA']?.toString(),
       ubicacion: map['ubicacion']?.toString(),
-      sincronizada: (map['sincronizada'] is bool)
-          ? map['sincronizada'] as bool
-          : (map['sincronizada'] == 1), // default false si null
       fechaRegistro: map['fechaRegistro']?.toString(),
       usuarioRegistro: map['usuarioRegistro']?.toString(),
       estado: (map['estado'] is bool)
           ? map['estado'] as bool
           : (map['estado'] == 1), // default true si null
       total: (map['total'] is num) ? (map['total'] as num).toDouble() : null,
+      descuento: (map['descuento'] is num) ? (map['descuento'] as num).toDouble() : null,
+      iva: (map['iva'] is num) ? (map['iva'] as num).toDouble() : null,
+      subTotal: (map['subTotal'] is num) ? (map['subTotal'] as num).toDouble() : null,
     );
   }
 }
@@ -1179,6 +1248,7 @@ class VentaModel {
 class DetalleVentaRapidaModel {
   int? idProducto;
   int? cantidad;
+  double? descuento;
   String? usuarioRegistro;
   double? costoUnitario;
   String? observaciones;
@@ -1186,6 +1256,7 @@ class DetalleVentaRapidaModel {
   DetalleVentaRapidaModel({
     this.idProducto,
     this.cantidad,
+    this.descuento,
     this.usuarioRegistro,
     this.costoUnitario,
     this.observaciones,
@@ -1195,6 +1266,7 @@ class DetalleVentaRapidaModel {
     return {
       'idProducto': idProducto,
       'cantidad': cantidad,
+      'descuento': descuento,
       'usuarioRegistro': usuarioRegistro,
       'costoUnitario': costoUnitario,
       'observaciones': observaciones,
@@ -1205,6 +1277,7 @@ class DetalleVentaRapidaModel {
     return DetalleVentaRapidaModel(
       idProducto: map['idProducto'],
       cantidad: map['cantidad'],
+      descuento: (map['descuento'] as num).toDouble(),
       usuarioRegistro: map['usuarioRegistro'],
       costoUnitario: (map['costoUnitario'] as num).toDouble(),
       observaciones: map['observaciones'],
@@ -1318,8 +1391,6 @@ class TipoProductoModel {
     );
   }
 }
-
-
 
 class TokenPayload {
   String aud;

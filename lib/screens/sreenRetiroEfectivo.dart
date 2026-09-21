@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:internet_connection_checker/internet_connection_checker.dart';
 import 'package:inversiones_ar/helpers/formatters.dart';
+import 'package:inversiones_ar/services/servicesPrinter.dart';
 import 'package:inversiones_ar/widgets/alertReusable.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 
@@ -62,7 +63,7 @@ class _EgresosCapitalScreenState extends ConsumerState<EgresosCapitalScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
 
-      await _cargarDatos(ref.read(authProvider).idCajaOpen);
+      await _cargarDatos(ref.read(authProvider).idCajaOpen, ref.read(authProvider).idAperturaCaja);
     });
   }
 
@@ -75,12 +76,66 @@ class _EgresosCapitalScreenState extends ConsumerState<EgresosCapitalScreen> {
     super.dispose();
   }
 
-  Future<void> _cargarDatos(int idCaja) async {
+  void _imprimirRetiro(RetiroEfectivoModel item) async {
+    final printerService = ref.read(printerProvider);
+    if(printerService.isPrinting || printerService.isPrinting) {
+      ToastSnackBar.show(
+        context,
+        type: ToastType.error,
+        message: 'Ya hay una impresion en curso.',
+      );
+      return;
+    }
+
+    try {
+      // if (printerService.selectedDeviceAddress == null) {
+      //   await printerService.showDeviceSelectionDialog(context);
+      // }
+
+      final bool success = await printerService.imprimirRetiroCaja(
+        context: context,
+        retiro: item,
+        isCopy: false,
+      );
+
+      if(success) {
+        ToastSnackBar.show(
+          context,
+          type: ToastType.success,
+          message: 'Impresion exitosa',
+        );
+      }
+    } catch(e) {
+      ToastSnackBar.show(
+        context,
+        type: ToastType.error,
+        message: 'Error al imprimir el retiro: $e',
+      );
+    }
+  }
+
+  void _confirmarImpresion(RetiroEfectivoModel retiro) async {
+    final valid = await AlertReusable.show(
+        context,
+        title: 'Imprimir ticket',
+        message: '¿Desae imprimir el ticket?',
+        yesText: 'SI',
+        noText: 'NO',
+        icon: Icons.check_circle_outline_sharp,
+        primaryColor: Colors.indigo
+    );
+
+    if(valid) {
+      _imprimirRetiro(retiro);
+    }
+  }
+
+  Future<void> _cargarDatos(int idCaja, int idAperturaCaja) async {
     try {
 
       final ResumenTotalesModel? resumen = await getResumenCajaTotales(idCaja);
       final List<GenericModelCombobox> conceptos = await getConceptosCombobox();
-      final List<RetiroEfectivoModel> movimientos = await getRetirosEfectivo(idCaja);
+      final List<RetiroEfectivoModel> movimientos = await getRetirosEfectivo(idAperturaCaja);
 
       if (!mounted) return;
       setState(() {
@@ -108,7 +163,7 @@ class _EgresosCapitalScreenState extends ConsumerState<EgresosCapitalScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final double monto = double.tryParse(_montoController.text) ?? 0;
-    final double disponible = (_resumen?.efectivoApertura ?? 0) - (_resumen?.totalRetiros ?? 0);
+    final double disponible = (_resumen?.totalEnCaja ?? 0);
 
     if (monto > disponible) {
       ToastSnackBar.show(
@@ -145,7 +200,7 @@ class _EgresosCapitalScreenState extends ConsumerState<EgresosCapitalScreen> {
           type: ToastType.success
       );
 
-      await _cargarDatos(idCaja);
+      await _cargarDatos(idCaja, ref.read(authProvider).idAperturaCaja);
     } catch (e) {
       if (!mounted) return;
       LoadingOverlay.hide();
@@ -170,9 +225,6 @@ class _EgresosCapitalScreenState extends ConsumerState<EgresosCapitalScreen> {
 
     if(openCaja) {
       await _registrarRetiro(idCaja);
-      Navigator.pop(context);
-    } else {
-      Navigator.pop(context);
     }
   }
 
@@ -470,9 +522,23 @@ class _EgresosCapitalScreenState extends ConsumerState<EgresosCapitalScreen> {
               ],
             ),
           ),
-          Text(
-            '- C\$ ${formattedNumber(item.monto as num)}',
-            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 14),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '- C\$ ${formattedNumber(item.monto as num)}',
+                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 14),
+              ),
+              const SizedBox(height: 2),
+              TextButton(
+                onPressed: () => _confirmarImpresion(item),
+                style: ButtonStyle(
+                  padding: MaterialStateProperty.all(EdgeInsets.zero),
+                  backgroundColor: MaterialStateProperty.all(Colors.indigo.shade50),
+                ),
+                child: const Icon(Icons.print_rounded, color: Colors.indigo),
+              ),
+            ]
           ),
         ],
       ),
@@ -490,6 +556,12 @@ class _EgresosCapitalScreenState extends ConsumerState<EgresosCapitalScreen> {
         scrolledUnderElevation: 4,
         shadowColor: Colors.grey[200],
         centerTitle: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(16),
+            bottomRight: Radius.circular(16),
+          ),
+        ),
         title: const Text(
           'EGRESOS DE CAPITAL',
           style: TextStyle(fontSize: 18.0, letterSpacing: 0.5),
@@ -506,12 +578,11 @@ class _EgresosCapitalScreenState extends ConsumerState<EgresosCapitalScreen> {
           ? Center(
         child: LoadingAnimationWidget.threeArchedCircle(color: Colors.indigo, size: 40),
       )
-          : Center(
-        child: ConstrainedBox(
+          : ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 800),
           child: RefreshIndicator(
             color: Colors.indigo,
-            onRefresh: () async => _cargarDatos(ref.watch(authProvider).idCajaOpen),
+            onRefresh: () async => _cargarDatos(ref.watch(authProvider).idCajaOpen, ref.watch(authProvider).idAperturaCaja),
             child: SingleChildScrollView(
               controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
@@ -559,11 +630,10 @@ class _EgresosCapitalScreenState extends ConsumerState<EgresosCapitalScreen> {
               ),
             ),
           )
-        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _abrirDialogoNuevoRetiro(ref.watch(authProvider).idCajaOpen),
-        backgroundColor: const Color(0xff1a237e),
+        backgroundColor: const Color(0xffe65100),
         icon: const Icon(Icons.remove_circle_outline, color: Colors.white),
         label: const Text(
           'Nuevo Retiro',

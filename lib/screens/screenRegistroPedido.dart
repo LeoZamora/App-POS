@@ -10,6 +10,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:inversiones_ar/services/geolocationServices.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
+import 'package:inversiones_ar/widgets/alertReusable.dart';
 import 'package:inversiones_ar/widgets/montosDialog.dart';
 import 'package:dropdown_flutter/custom_dropdown.dart';
 import 'package:inversiones_ar/widgets/overlayCircle.dart';
@@ -47,6 +48,7 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
   String? tipo;
   bool isLoading = false;
   bool isStock = false;
+  bool autoDirection = true;
 
   late Map<String, dynamic> venta = {};
   late List<Map<String, dynamic>> productos = [];
@@ -287,19 +289,19 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
         LoadingOverlay.show(context, message: 'Obteniendo ubicación...');
 
         String localidad = 'Ubicación no disponible';
-        try {
-          Position position = await getCurrentLocation();
-          print('POSICION: ${position.toString()}');
-          localidad = await getLocalidad(position);
-          print('LOCALIDAD: $localidad');
-          LoadingOverlay.show(context, message: 'Ubicación obtenida');
-          Future.delayed(const Duration(milliseconds: 500), () {});
-        } catch (e) {
-          LoadingOverlay.show(context, message: 'Ubicación no disponible');
-          Future.delayed(const Duration(milliseconds: 500), () {});
-          print('No se pudo obtener ubicación, se continúa sin ella: $e');
-          // localidad se queda en 'Ubicación no disponible'
-        }
+        // try {
+        //   Position position = await getCurrentLocation();
+        //   print('POSICION: ${position.toString()}');
+        //   localidad = await getLocalidad(position);
+        //   print('LOCALIDAD: $localidad');
+        //   LoadingOverlay.show(context, message: 'Ubicación obtenida');
+        //   Future.delayed(const Duration(milliseconds: 500), () {});
+        // } catch (e) {
+        //   LoadingOverlay.show(context, message: 'Ubicación no disponible');
+        //   Future.delayed(const Duration(milliseconds: 500), () {});
+        //   print('No se pudo obtener ubicación, se continúa sin ella: $e');
+        //   // localidad se queda en 'Ubicación no disponible'
+        // }
 
         setState(() {
           location = localidad;
@@ -382,6 +384,22 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
           message: e.toString(),
         );
       }
+    }
+  }
+
+  void _confirmarRegistrarPedido(BuildContext context) async {
+    final valid = await AlertReusable.show(
+        context,
+        title: 'Registrar pedido',
+        message: '¿Estás seguro de que deseas registrar este pedido?',
+        yesText: 'SI',
+        noText: 'NO',
+        icon: Icons.check_circle_outline_sharp,
+        primaryColor: Colors.indigo
+    );
+
+    if(valid) {
+      await _imprimirFactura();
     }
   }
 
@@ -527,6 +545,7 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
                                   _mensajeErrorStock = 'Seleccione un producto';
                                   return;
                                 }
+
                                 final double cantidadIngresada = double.tryParse(_cantidadController.text) ?? 0;
                                 final double stockDisponibleTotal = _productoAdd?.cantidadTotal ?? 0;
 
@@ -795,13 +814,13 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
 
                               final double stockTotal = value.cantidadTotal ?? 0;
 
-                              if (stockTotal <= 0) {
-                                setDialogState(() {
-                                  _mensajeErrorStock = 'No hay stock disponible para este producto';
-                                  _productoSeleccionado = null;
-                                });
-                                return;
-                              }
+                              // if (stockTotal <= 0) {
+                              //   setDialogState(() {
+                              //     _mensajeErrorStock = 'No hay stock disponible para este producto';
+                              //     _productoSeleccionado = null;
+                              //   });
+                              //   return;
+                              // }
 
                               // Verificar si ya se agregó todo el stock al carrito
                               final int existIndex = detallePedido.indexWhere(
@@ -941,6 +960,7 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
       _esCredito = false;
       totalVenta = 0.0;
       _clienteSeleccionado = null;
+      _direccionSeleccionada = null;
 
     });
   }
@@ -1032,7 +1052,6 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        toolbarHeight: 80,
         foregroundColor: Colors.black,
         backgroundColor: Colors.white,
         notificationPredicate: (ScrollNotification notification) {
@@ -1042,11 +1061,17 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
         scrolledUnderElevation: 4,
         shadowColor: Colors.grey[200],
         centerTitle: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(16),
+            bottomRight: Radius.circular(16),
+          ),
+        ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(
-                '${title.toUpperCase()}',
+                title.toUpperCase(),
                 style: TextStyle(
                   fontSize: 18.0,
                   letterSpacing: 0.5,
@@ -1119,67 +1144,70 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
                   const SizedBox(height: 10),
 
                   // --- SECCIÓN: CLIENTE ---
-                  TypeAheadField(
-                    key: ValueKey(_clienteSeleccionado?.idCliente),
-                    suggestionsCallback: (search) {
-                      return _clientes.where((cliente) {
-                        return cliente.nombre.toLowerCase().contains(search.toLowerCase());
-                      }).toList();
-                    },
-                    builder: (context, controller, focusNode) {
-                      // Si ya hay un cliente seleccionado, precargamos su nombre en el buscador
-                      if (_clienteSeleccionado != null && controller.text.isEmpty) {
-                        controller.text = _clienteSeleccionado!.nombre;
-                      }
-                      return TextField(
-                        controller: controller,
-                        focusNode: focusNode,
-                        decoration: InputDecoration(
-                          labelText: 'Cliente',
-                          labelStyle: const TextStyle(color: Colors.grey),
-                          hintText: 'Elija un cliente',
-                          hintStyle: const TextStyle(color: Colors.grey),
-                          prefixIcon: const Icon(Icons.person_search, color: Colors.grey),
-                          suffixIcon: _clienteSeleccionado != null
-                              ? IconButton(
-                            icon: const Icon(Icons.clear, color: Colors.red),
-                            onPressed: () {
-                              controller.clear();
-                              setState(() => _clienteSeleccionado = null);
-                            },
+                  DropdownFlutter<ClienteModel>.search(
+                    key: const ValueKey('clientes_combobox'),
+                    enabled: true,
+                    initialItem: _clienteSeleccionado,
+                    hintText: 'Seleccione un cliente',
+                    items: _clientes,
+                    excludeSelected: true,
+                    decoration: const CustomDropdownDecoration(
+                      expandedFillColor: Colors.white,
+                      hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
+                      headerStyle: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                      prefixIcon: Icon(Icons.list_alt_rounded, color: Colors.grey),
+
+                      // Bordes
+                      closedBorder: Border(
+                        top: BorderSide(color: Colors.grey),
+                        bottom: BorderSide(color: Colors.grey),
+                        left: BorderSide(color: Colors.grey),
+                        right: BorderSide(color: Colors.grey),
+                      ),
+
+                      closedSuffixIcon: Icon(Icons.keyboard_arrow_down_rounded, color: Colors.indigo),
+                      expandedSuffixIcon: Icon(Icons.keyboard_arrow_up_rounded, color: Colors.indigo),
+                    ),
+                    listItemBuilder: (context, item, isSelected, onItemSelected) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(item.nombre ?? ''),
+                          const SizedBox(height: 4),
+                          Text(
+                            'De: ${item.municipio ?? ''}',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 12,
+                            ),
                           )
-                              : const Icon(Icons.search, color: Colors.grey,),
-                          border: const OutlineInputBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(12)),
-                          ),
-                        ),
-                        style: TextStyle(
-                            color: Colors.grey[600],
-                            height: 2
-                        ),
-                        cursorHeight: 25,
+                        ],
                       );
                     },
-                    itemBuilder: (context, cliente) {
-                      return ListTile(
-                        leading: const CircleAvatar(
-                          backgroundColor: Colors.indigo,
-                          child: Icon(Icons.person, color: Colors.white, size: 20),
+                    validateOnChange: true,
+                    validator: (value) => value == null ? 'Seleccione un cliente' : null,
+                    headerBuilder: (context, selectedItem, enabled) {
+                      return Text(
+                        _clienteSeleccionado?.nombre ?? '',
+                        style: const TextStyle(
+                          fontSize: 16,
                         ),
-                        title: Text(cliente.nombre, style: const TextStyle(fontWeight: FontWeight.w600)),
-                        subtitle: Text(cliente.departamento ?? 'Sin departamento'),
                       );
                     },
-                    onSelected: (cliente) async {
-                      // 1. Primero actualizas el cliente seleccionado
-                      if (cliente.idCliente != null) {
-                        await Future.wait([
-                          _getClienteById(cliente.idCliente!),
-                          setCreditoCliente(cliente.idCliente!)
-                        ]);
-                      }
+                    onChanged: (val) async {
+                      if (val == null) return;
+                      setState(() {
+                        _clienteSeleccionado = val;
+                        direcciones = val.direcciones ?? [];
+                      });
+
+                      await Future.wait([
+                        // _getClienteById(val.idCliente!),
+                        setCreditoCliente(val.idCliente!)
+                      ]);
                     },
                   ),
+
                   if (_clienteSeleccionado != null) ...[
                     const SizedBox(height: 8),
                     Padding(
@@ -1196,13 +1224,46 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
                             _clienteSeleccionado?.departamento ?? '- - -',
                             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                           ),
+                          const Spacer(),
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Text(
+                                !autoDirection ? 'Ingresar dirección' : 'Elegir dirección',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              Switch(
+                                value: autoDirection,
+                                onChanged: (val) {
+                                  if(val) {
+                                    setState(() {
+                                      autoDirection = val;
+                                      _direccionSeleccionada = null;
+                                    });
+                                  } else {
+                                    setState(() {
+                                      autoDirection = val;
+                                      enviarAController.clear();
+                                    });
+                                  }
+                                },
+                                activeColor: const Color(0xff1a237e),
+                              ),
+                            ],
+                          )
                         ],
                       ),
                     ),
                   ],
-                  const SizedBox(height: 12),
 
-                  DropdownFlutter<DireccionesClientes>.search(
+
+                  if(autoDirection) const SizedBox(height: 12),
+
+                  if(autoDirection) DropdownFlutter<DireccionesClientes>.search(
                       enabled: _clienteSeleccionado != null,
                       key: const ValueKey('cliente_direccion'),
                       items: direcciones,
@@ -1261,6 +1322,28 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
                       }
                   ),
 
+                  if(!autoDirection) const SizedBox(height: 20),
+
+                  if(!autoDirection) TextFormField(
+                    controller: enviarAController,
+                    decoration: const InputDecoration(
+                        labelText: 'Enviar a (Dirección)',
+                        labelStyle: const TextStyle(color: Colors.grey),
+                        prefixIcon: Icon(Icons.local_shipping_outlined, color: Colors.grey),
+                        isDense: true,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(12)),
+                          borderSide: BorderSide(color: Colors.grey),
+                        )
+                    ),
+                    style: TextStyle(
+                        color: Colors.grey[600],
+                        height: 2
+                    ),
+                    cursorHeight: 25,
+                  ),
+                  const SizedBox(height: 16),
+
                   const SizedBox(height: 16),
 
                   TextFormField(
@@ -1271,14 +1354,14 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
                       labelText: 'Fecha de Entrega',
                       labelStyle: const TextStyle(color: Colors.grey),
                       prefixIcon: Icon(Icons.calendar_month_outlined, color: Colors.grey),
-                      isDense: false,
+                      isDense: true,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(12)),
                       )
                     ),
                     style: TextStyle(
                         color: Colors.grey[600],
-                        height: 2.5
+                        height: 2
                     ),
                     cursorHeight: 25,
                     onTap: () async {
@@ -1302,6 +1385,8 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
 
                     },
                   ),
+
+
                   const SizedBox(height: 16),
 
                   TextFormField(
@@ -1310,7 +1395,7 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
                       labelText: 'Observaciones',
                       labelStyle: const TextStyle(color: Colors.grey),
                       prefixIcon: Icon(Icons.comment_outlined, color: Colors.grey),
-                      isDense: false,
+                      isDense: true,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(12)),
                       )
@@ -1522,11 +1607,12 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
           surfaceTintColor: Colors.white,
           shadowColor: Colors.grey[200],
           padding: EdgeInsets.symmetric(vertical: 14, horizontal: 18),
-          child: SizedBox.expand(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: 10),
             child: TextButton(
                 style: TextButton.styleFrom(
-                  foregroundColor: Colors.indigo,
-                  backgroundColor: Color(0xff1a237e),
+                  foregroundColor: Colors.white,
+                  backgroundColor: const Color(0xffe65100),
                   alignment: Alignment.center,
                 ),
                 onPressed: () async {
@@ -1578,7 +1664,7 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
                       return;
                     }
                   }
-                  _imprimirFactura();
+                  _confirmarRegistrarPedido(context);
                 },
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
