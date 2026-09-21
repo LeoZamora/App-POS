@@ -7,8 +7,8 @@ import 'package:inversiones_ar/screens/mainScreen.dart';
 import 'package:inversiones_ar/login/loginApp.dart';
 import 'package:inversiones_ar/screens/screenCaja.dart';
 import 'package:inversiones_ar/screens/screenPedidoById.dart';
-import 'package:inversiones_ar/widgets/overlayCircle.dart';
 import 'package:inversiones_ar/screens/sreenRetiroEfectivo.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
 
 import '../features/auth/models/authState.dart';
 
@@ -38,19 +38,20 @@ class SplashScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const CircularProgressIndicator(
-              strokeWidth: 3,
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.indigo),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              message,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Colors.grey.shade700,
+            LoadingAnimationWidget.threeArchedCircle(color: Colors.indigo, size: 40),
+            if (message.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(
+                message,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                  decoration: TextDecoration.none,
+                ),
+                textAlign: TextAlign.center,
               ),
-            ),
+            ],
           ],
         ),
       ),

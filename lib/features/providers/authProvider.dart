@@ -129,6 +129,18 @@ class AuthNotifier extends Notifier<AuthState> {
     } catch (e, stackTrace) {
       print('ERROR: $e');
       print('STACKTRACE: $stackTrace');
+
+      await _storage.delete(key: _cajaKey);
+      await _storage.delete(key: _cajaStatusKey);
+
+      state = state.copyWith(
+          status: AuthStatus.unauthenticated,
+          token: null,
+          userPayload: null,
+          isCajaOpen: false,
+          permisos: []
+      );
+
       // await _storage.delete(key: _tokenKey);
       return logout();
     }
@@ -179,7 +191,7 @@ class AuthNotifier extends Notifier<AuthState> {
             userPayload: TokenPayload.fromMap(jwt.payload),
             isCajaOpen: cajaAbiertaLocal,
             idCajaOpen: idCajaLocal,
-            idAperturaCaja: idAperturaCajaLocal,
+            idAperturaCaja: statusCaja['apertura']['idAperturaCaja'],
             permisos: permisosList
         );
       } else {
@@ -408,7 +420,7 @@ class AuthNotifier extends Notifier<AuthState> {
     state = state.copyWith(idAperturaCaja: idAperturaCaja);
   }
 
-  Future<void> openCaja(int idCaja) async {
+  Future<void> openCaja(int idCaja, int idApertura) async {
     try {
       await Future.wait([
         _storage.write(key: _cajaKey, value: 'true'),
@@ -416,9 +428,9 @@ class AuthNotifier extends Notifier<AuthState> {
       ]);
 
       state = state.copyWith(
-          status: AuthStatus.authenticated,
           isCajaOpen: true,
           idCajaOpen: idCaja,
+          idAperturaCaja: idApertura
       );
     } catch (e) {
       logout();
@@ -457,7 +469,15 @@ class AuthNotifier extends Notifier<AuthState> {
 
   Future<void> logout() async {
     await _storage.delete(key: _tokenKey);
-    state = state.copyWith(status: AuthStatus.unauthenticated);
+    state = state.copyWith(
+      status: AuthStatus.unauthenticated,
+      token: null,
+      userPayload: null,
+      isCajaOpen: false,
+      idCajaOpen: 0,
+      idAperturaCaja: 0,
+      permisos: [],
+    );
   }
 }
 

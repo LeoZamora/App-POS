@@ -271,10 +271,9 @@ class _PedidosScreenState extends ConsumerState<PedidosScreen>  with RouteAware 
         ],
       ),
 
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
-          child: SingleChildScrollView(
+      body: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: SingleChildScrollView(
           controller: _scrollController,
           padding: const EdgeInsets.fromLTRB(0, 0, 0, 24),
           child: Column(
@@ -292,9 +291,9 @@ class _PedidosScreenState extends ConsumerState<PedidosScreen>  with RouteAware 
                       controller: noPedidoController,
                       keyboardType: TextInputType.text,
                       decoration: const InputDecoration(
-                        labelText: 'NO. Pedido',
-                        labelStyle: TextStyle(color: Colors.grey),
-                        prefixIcon: Icon(Icons.calendar_month_outlined, color: Colors.grey),
+                          labelText: 'NO. Pedido',
+                          labelStyle: TextStyle(color: Colors.grey),
+                          prefixIcon: Icon(Icons.calendar_month_outlined, color: Colors.grey),
                           isDense: true,
                           hintText: 'PE-XX',
                           border: OutlineInputBorder(
@@ -308,7 +307,7 @@ class _PedidosScreenState extends ConsumerState<PedidosScreen>  with RouteAware 
                       cursorHeight: 25,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return 'Ingrese la cantidad';
+                          return 'Ingrese un número de pedido';
                         }
                         return null;
                       },
@@ -316,59 +315,62 @@ class _PedidosScreenState extends ConsumerState<PedidosScreen>  with RouteAware 
 
                     const SizedBox(height: 12),
 
-                    TypeAheadField(
-                      key: ValueKey(_clienteSeleccionado?.idCliente),
-                      suggestionsCallback: (search) {
-                        return _clientes.where((cliente) {
-                          return cliente.nombre.toLowerCase().contains(search.toLowerCase());
-                        }).toList();
-                      },
-                      builder: (context, controller, focusNode) {
-                        // Si ya hay un cliente seleccionado, precargamos su nombre en el buscador
-                        if (_clienteSeleccionado != null && controller.text.isEmpty) {
-                          controller.text = _clienteSeleccionado!.nombre;
-                        }
-                        return TextField(
-                          controller: controller,
-                          focusNode: focusNode,
-                          decoration: InputDecoration(
-                            labelText: 'Cliente',
-                            labelStyle: const TextStyle(color: Colors.grey),
-                            hintText: 'Elija un cliente',
-                            hintStyle: const TextStyle(color: Colors.grey),
-                            prefixIcon: const Icon(Icons.person_search, color: Colors.grey),
-                            suffixIcon: _clienteSeleccionado != null
-                                ? IconButton(
-                              icon: const Icon(Icons.clear, color: Colors.red),
-                              onPressed: () {
-                                controller.clear();
-                                setState(() => _clienteSeleccionado = null);
-                              },
+                    DropdownFlutter<ClienteModel>.search(
+                      key: const ValueKey('clientes_combobox'),
+                      enabled: true,
+                      initialItem: _clienteSeleccionado,
+                      hintText: 'Seleccione un cliente',
+                      items: _clientes,
+                      excludeSelected: true,
+                      decoration: const CustomDropdownDecoration(
+                        expandedFillColor: Colors.white,
+                        hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
+                        headerStyle: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                        prefixIcon: Icon(Icons.people_outline_rounded, color: Colors.grey),
+
+                        // Bordes
+                        closedBorder: Border(
+                          top: BorderSide(color: Colors.grey),
+                          bottom: BorderSide(color: Colors.grey),
+                          left: BorderSide(color: Colors.grey),
+                          right: BorderSide(color: Colors.grey),
+                        ),
+
+                        closedSuffixIcon: Icon(Icons.keyboard_arrow_down_rounded, color: Colors.indigo),
+                        expandedSuffixIcon: Icon(Icons.keyboard_arrow_up_rounded, color: Colors.indigo),
+                      ),
+                      listItemBuilder: (context, item, isSelected, onItemSelected) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(item.nombre ?? ''),
+                            const SizedBox(height: 4),
+                            Text(
+                              'De: ${item.municipio ?? ''}',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 12,
+                              ),
                             )
-                                : const Icon(Icons.search, color: Colors.grey,),
-                            border: const OutlineInputBorder(
-                              borderRadius: BorderRadius.all(Radius.circular(12)),
-                            ),
-                          ),
-                          style: TextStyle(
-                              color: Colors.grey[600],
-                              height: 2
-                          ),
-                          cursorHeight: 25,
+                          ],
                         );
                       },
-                      itemBuilder: (context, cliente) {
-                        return ListTile(
-                          leading: const CircleAvatar(
-                            backgroundColor: Colors.indigo,
-                            child: Icon(Icons.person, color: Colors.white, size: 20),
+                      validateOnChange: true,
+                      validator: (value) => value == null ? 'Seleccione un cliente' : null,
+                      headerBuilder: (context, selectedItem, enabled) {
+                        return Text(
+                          _clienteSeleccionado?.nombre ?? '',
+                          style: const TextStyle(
+                            fontSize: 16,
                           ),
-                          title: Text(cliente.nombre, style: const TextStyle(fontWeight: FontWeight.w600)),
-                          subtitle: Text(cliente.departamento ?? 'Sin departamento'),
                         );
                       },
-                      onSelected: (cliente) {
-                        setState(() => _clienteSeleccionado = cliente);
+                      onChanged: (val) async {
+                        if (val == null) return;
+
+                        setState(() {
+                          _clienteSeleccionado = val;
+                        });
                       },
                     ),
 
@@ -435,14 +437,14 @@ class _PedidosScreenState extends ConsumerState<PedidosScreen>  with RouteAware 
                               readOnly: true,
                               keyboardType: TextInputType.datetime,
                               decoration: const InputDecoration(
-                                labelText: 'Desde',
-                                labelStyle: TextStyle(color: Colors.grey),
-                                prefixIcon: Icon(Icons.calendar_month_outlined, color: Colors.grey),
-                                isDense: true,
-                                hintText: 'DD/MM/AAAA',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.all(Radius.circular(12)),
-                                )
+                                  labelText: 'Desde',
+                                  labelStyle: TextStyle(color: Colors.grey),
+                                  prefixIcon: Icon(Icons.calendar_month_outlined, color: Colors.grey),
+                                  isDense: true,
+                                  hintText: 'DD/MM/AAAA',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.all(Radius.circular(12)),
+                                  )
                               ),
                               style: TextStyle(
                                   color: Colors.grey[600],
@@ -478,14 +480,14 @@ class _PedidosScreenState extends ConsumerState<PedidosScreen>  with RouteAware 
                               readOnly: true,
                               keyboardType: TextInputType.datetime,
                               decoration: const InputDecoration(
-                                labelText: 'Hasta',
-                                labelStyle: TextStyle(color: Colors.grey),
-                                prefixIcon: Icon(Icons.calendar_month_outlined, color: Colors.grey),
-                                isDense: true,
-                                hintText: 'DD/MM/AAAA',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.all(Radius.circular(12)),
-                                )
+                                  labelText: 'Hasta',
+                                  labelStyle: TextStyle(color: Colors.grey),
+                                  prefixIcon: Icon(Icons.calendar_month_outlined, color: Colors.grey),
+                                  isDense: true,
+                                  hintText: 'DD/MM/AAAA',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.all(Radius.circular(12)),
+                                  )
                               ),
                               style: TextStyle(
                                   color: Colors.grey[600],
@@ -757,8 +759,7 @@ class _PedidosScreenState extends ConsumerState<PedidosScreen>  with RouteAware 
             ],
           ),
         ),
-        )
-      ),
+      )
     );
   }
 }
