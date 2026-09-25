@@ -11,7 +11,7 @@ final locationServices = UbicationService();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  locationServices.startLocationUpdatesPeriodically();
+  // locationServices.startLocationUpdatesPeriodically();
   await initializeDateFormatting('es_ES', null);
 
 

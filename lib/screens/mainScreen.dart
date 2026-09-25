@@ -33,6 +33,7 @@ class _InicioScreenState extends ConsumerState<InicioScreen> with RouteAware {
   final FloatingActionButtonLocation _fabLocation = FloatingActionButtonLocation.endDocked;
 
   final connectionChecker = InternetConnectionChecker.instance;
+  final _scrollController = ScrollController();
   bool isConnected = false;
   bool isLoading = false;
   late StreamSubscription<InternetConnectionStatus> _connectionStatus;
@@ -212,6 +213,7 @@ class _InicioScreenState extends ConsumerState<InicioScreen> with RouteAware {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _connectionStatus.cancel();
     routerObserver.unsubscribe(this);
     super.dispose();
@@ -274,306 +276,309 @@ class _InicioScreenState extends ConsumerState<InicioScreen> with RouteAware {
           ),
         ),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
+      body: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 800),
+        child: RefreshIndicator(
+          color: Colors.indigo,
+          onRefresh: () async => resumenCaja(ref.watch(authProvider).idCajaOpen),
+          child: SingleChildScrollView(
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
               child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1400),
-                  child: Column(
-                    children: [
-                      if(authState.existePermission(32))
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Color(0xff1a237e),
-                              backgroundBlendMode: BlendMode.darken,
-                              borderRadius: BorderRadius.circular(15),
-                              border: Border.all(color: Colors.grey[200]!, width: 1),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.04),
-                                  blurRadius: 15,
-                                  offset: const Offset(0, 5),
-                                )
-                              ],
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Expanded(
-                                      child: Row(
-                                        children: [
-                                          const Text(
-                                            'Resumen de ',
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                          Expanded(
-                                            child: Text(
-                                              (_resumenCaja?.cajaNombre ?? 'Totales').toUpperCase(),
-                                              style: const TextStyle(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1400),
+                    child: Column(
+                      children: [
+                        if(authState.existePermission(32))
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Color(0xff1a237e),
+                                backgroundBlendMode: BlendMode.darken,
+                                borderRadius: BorderRadius.circular(15),
+                                border: Border.all(color: Colors.grey[200]!, width: 1),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.04),
+                                    blurRadius: 15,
+                                    offset: const Offset(0, 5),
+                                  )
+                                ],
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        child: Row(
+                                          children: [
+                                            const Text(
+                                              'Resumen de ',
+                                              style: TextStyle(
                                                 fontSize: 16,
-                                                fontWeight: FontWeight.bold,
                                                 color: Colors.white,
                                               ),
-                                              overflow: TextOverflow.ellipsis,
-                                              maxLines: 1,
-                                              softWrap: false,
                                             ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    const Icon(Icons.account_balance_wallet, color: Colors.white, size: 22),
-                                  ],
-                                ),
-
-                                const SizedBox(height: 5),
-                                const Divider(height: 1, color: Colors.white30),
-                                const SizedBox(height: 5),
-
-                                // --- DESGLOSE DE VENTAS ---
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Text(
-                                      'Total de Pedidos:',
-                                      style: TextStyle(color: Colors.white70, fontSize: 15),
-                                    ),
-
-                                    !isLoading ? Text(
-                                      'C\$ ${formattedNumber((_resumenTotales?.totalPedidos ?? 0).toDouble())}',
-                                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
-                                    ) : LoadingAnimationWidget.waveDots(
-                                        color: Colors.white,
-                                        size: 20
-                                    ),
-                                  ],
-                                ),
-
-                                if (authState.existePermission(32)) const SizedBox(height: 5),
-
-                                // if (authState.existePermission(32)) Row(
-                                //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                //   children: [
-                                //     const Text(
-                                //       'Valor Mercaderia:',
-                                //       style: TextStyle(color: Colors.white70, fontSize: 15),
-                                //     ),
-                                //
-                                //     !isLoading ? Text(
-                                //       'C\$ ${formattedNumber((_resumenTotales?.totalMercaderia ?? 0).toDouble())}',
-                                //       style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
-                                //     ) : LoadingAnimationWidget.waveDots(
-                                //         color: Colors.white,
-                                //         size: 20
-                                //     ),
-                                //   ],
-                                // ),
-
-                                if (authState.existePermission(32)) const SizedBox(height: 5),
-
-                                if (authState.existePermission(32)) Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Text(
-                                      'Total Egresos:',
-                                      style: TextStyle(color: Colors.white70, fontSize: 15),
-                                    ),
-                                    !isLoading ? Text(
-                                      'C\$ ${formattedNumber((_resumenTotales?.totalRetiros ?? 0).toDouble())}',
-                                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
-                                    ) : LoadingAnimationWidget.waveDots(
-                                        color: Colors.white,
-                                        size: 20
-                                    ),
-                                  ],
-                                ),
-
-                                if (authState.existePermission(32)) const SizedBox(height: 5),
-
-                                if (authState.existePermission(32)) Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Text(
-                                      'Apertura con:',
-                                      style: TextStyle(color: Colors.white70, fontSize: 15),
-                                    ),
-                                    !isLoading ? Text(
-                                      'C\$ ${formattedNumber((_resumenTotales?.efectivoApertura ?? 0).toDouble())}',
-                                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
-                                    ) : LoadingAnimationWidget.waveDots(
-                                        color: Colors.white,
-                                        size: 20
-                                    ),
-                                  ],
-                                ),
-
-                                if (authState.existePermission(32)) const SizedBox(height: 5),
-
-                                if (authState.existePermission(32)) Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Text(
-                                      'Total de Ventas:',
-                                      style: TextStyle(color: Colors.white70, fontSize: 15),
-                                    ),
-                                    !isLoading ? Text(
-                                      'C\$ ${formattedNumber((_resumenTotales?.totalVentas ?? 0).toDouble())}',
-                                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
-                                    ) : LoadingAnimationWidget.waveDots(
-                                        color: Colors.white,
-                                        size: 20
-                                    ),
-                                  ],
-                                ),
-
-
-                                const SizedBox(height: 5),
-                                const Divider(height: 1, color: Colors.white30),
-                                const SizedBox(height: 5),
-
-                                // --- DESGLOSE DE VENTAS ---
-
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    // Icon(Icons.currency_exchange_outlined, color: Colors.white, size: 30),
-                                    Column(
-                                      // mainAxisAlignment: MainAxisAlignment.end,
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      children: [
-                                        const Text(
-                                          'Total',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 15,
-                                          ),
-                                        ),
-                                        !isLoading ? Text(
-                                          'C\$ ${formattedNumber((_resumenTotales?.totalEnCaja ?? 0).toDouble())}',
-                                          style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w500),
-                                        ) : LoadingAnimationWidget.waveDots(
-                                            color: Colors.white,
-                                            size: 50
-                                        ),
-                                      ],
-                                    )
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                      Padding(
-                          padding: const EdgeInsets.fromLTRB(8, 16, 8, 16),
-                          child: GridView.builder(
-                              shrinkWrap: true,
-                              itemCount: cardsPermitidas.length,
-                              physics: const NeverScrollableScrollPhysics(),
-                              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                                maxCrossAxisExtent: 250,
-                                mainAxisSpacing: 14,
-                                crossAxisSpacing: 14,
-                                childAspectRatio: 1.1,
-                              ),
-                              itemBuilder: (context, index) {
-                                final item = cardsPermitidas[index];
-                                final Color cardColor = item['color'] ?? Colors.indigo;
-
-                                return Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(20),
-                                    // Borde más sutil
-                                    border: Border.all(color: Colors.grey.withOpacity(0.15), width: 1),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.04), // Sombra mucho más suave
-                                        blurRadius: 15, // Más difuminada
-                                        offset: const Offset(0, 8), // Un poco más abajo para dar profundidad
-                                      )
-                                    ],
-                                  ),
-                                  // Material va DENTRO del Container y es transparente para mostrar el fondo
-                                  child: Material(
-                                    color: Colors.transparent,
-                                    borderRadius: BorderRadius.circular(20),
-                                    clipBehavior: Clip.antiAlias, // Evita que el toque se salga de los bordes curvos
-                                    child: InkWell(
-                                      splashColor: Colors.indigo[100], // El toque toma el color de tu tema
-                                      highlightColor: Colors.indigo[100],
-                                      onTap: () {
-                                        if (item.containsKey("widget") && item["widget"] != null) {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(builder: (_) => item["widget"]),
-                                          );
-                                        }
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 20.0), // Mejor balance de espacios
-                                        child: Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            // Contenedor del Icono
-                                            Container(
-                                              padding: const EdgeInsets.all(14),
-                                              decoration: BoxDecoration(
-                                                color: cardColor.withOpacity(0.1),
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: Icon(
-                                                item['icon'],
-                                                size: 30,
-                                                color: cardColor,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 16),
-                                            Text(
-                                              item['title'],
-                                              textAlign: TextAlign.center,
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                fontSize: 15,
-                                                fontWeight: FontWeight.w600,
-                                                color: Color(0xFF2D3748),
-                                                letterSpacing: 0.3,
+                                            Expanded(
+                                              child: Text(
+                                                (_resumenCaja?.cajaNombre ?? 'Totales').toUpperCase(),
+                                                style: const TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                                maxLines: 1,
+                                                softWrap: false,
                                               ),
                                             ),
                                           ],
                                         ),
                                       ),
-                                    ),
+                                      const SizedBox(width: 8),
+                                      const Icon(Icons.account_balance_wallet, color: Colors.white, size: 22),
+                                    ],
                                   ),
-                                );
-                              }
-                          )
-                      ),
 
-                      const SizedBox(height: 32),
-                    ],
-                  ),
-                )
+                                  const SizedBox(height: 5),
+                                  const Divider(height: 1, color: Colors.white30),
+                                  const SizedBox(height: 5),
+
+                                  // --- DESGLOSE DE VENTAS ---
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        'Total de Pedidos:',
+                                        style: TextStyle(color: Colors.white70, fontSize: 15),
+                                      ),
+
+                                      !isLoading ? Text(
+                                        'C\$ ${formattedNumber((_resumenTotales?.totalPedidos ?? 0).toDouble())}',
+                                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+                                      ) : LoadingAnimationWidget.waveDots(
+                                          color: Colors.white,
+                                          size: 20
+                                      ),
+                                    ],
+                                  ),
+
+                                  if (authState.existePermission(32)) const SizedBox(height: 5),
+
+                                  // if (authState.existePermission(32)) Row(
+                                  //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  //   children: [
+                                  //     const Text(
+                                  //       'Valor Mercaderia:',
+                                  //       style: TextStyle(color: Colors.white70, fontSize: 15),
+                                  //     ),
+                                  //
+                                  //     !isLoading ? Text(
+                                  //       'C\$ ${formattedNumber((_resumenTotales?.totalMercaderia ?? 0).toDouble())}',
+                                  //       style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+                                  //     ) : LoadingAnimationWidget.waveDots(
+                                  //         color: Colors.white,
+                                  //         size: 20
+                                  //     ),
+                                  //   ],
+                                  // ),
+
+                                  if (authState.existePermission(32)) const SizedBox(height: 5),
+
+                                  if (authState.existePermission(32)) Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        'Total Egresos:',
+                                        style: TextStyle(color: Colors.white70, fontSize: 15),
+                                      ),
+                                      !isLoading ? Text(
+                                        'C\$ ${formattedNumber((_resumenTotales?.totalRetiros ?? 0).toDouble())}',
+                                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+                                      ) : LoadingAnimationWidget.waveDots(
+                                          color: Colors.white,
+                                          size: 20
+                                      ),
+                                    ],
+                                  ),
+
+                                  if (authState.existePermission(32)) const SizedBox(height: 5),
+
+                                  if (authState.existePermission(32)) Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        'Apertura con:',
+                                        style: TextStyle(color: Colors.white70, fontSize: 15),
+                                      ),
+                                      !isLoading ? Text(
+                                        'C\$ ${formattedNumber((_resumenTotales?.efectivoApertura ?? 0).toDouble())}',
+                                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+                                      ) : LoadingAnimationWidget.waveDots(
+                                          color: Colors.white,
+                                          size: 20
+                                      ),
+                                    ],
+                                  ),
+
+                                  if (authState.existePermission(32)) const SizedBox(height: 5),
+
+                                  if (authState.existePermission(32)) Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        'Total de Ventas:',
+                                        style: TextStyle(color: Colors.white70, fontSize: 15),
+                                      ),
+                                      !isLoading ? Text(
+                                        'C\$ ${formattedNumber((_resumenTotales?.totalVentas ?? 0).toDouble())}',
+                                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+                                      ) : LoadingAnimationWidget.waveDots(
+                                          color: Colors.white,
+                                          size: 20
+                                      ),
+                                    ],
+                                  ),
+
+
+                                  const SizedBox(height: 5),
+                                  const Divider(height: 1, color: Colors.white30),
+                                  const SizedBox(height: 5),
+
+                                  // --- DESGLOSE DE VENTAS ---
+
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      // Icon(Icons.currency_exchange_outlined, color: Colors.white, size: 30),
+                                      Column(
+                                        // mainAxisAlignment: MainAxisAlignment.end,
+                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        children: [
+                                          const Text(
+                                            'Total',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 15,
+                                            ),
+                                          ),
+                                          !isLoading ? Text(
+                                            'C\$ ${formattedNumber((_resumenTotales?.totalEnCaja ?? 0).toDouble())}',
+                                            style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w500),
+                                          ) : LoadingAnimationWidget.waveDots(
+                                              color: Colors.white,
+                                              size: 50
+                                          ),
+                                        ],
+                                      )
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                        Padding(
+                            padding: const EdgeInsets.fromLTRB(8, 16, 8, 16),
+                            child: GridView.builder(
+                                shrinkWrap: true,
+                                itemCount: cardsPermitidas.length,
+                                physics: const NeverScrollableScrollPhysics(),
+                                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                                  maxCrossAxisExtent: 250,
+                                  mainAxisSpacing: 14,
+                                  crossAxisSpacing: 14,
+                                  childAspectRatio: 1.1,
+                                ),
+                                itemBuilder: (context, index) {
+                                  final item = cardsPermitidas[index];
+                                  final Color cardColor = item['color'] ?? Colors.indigo;
+
+                                  return Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(20),
+                                      // Borde más sutil
+                                      border: Border.all(color: Colors.grey.withOpacity(0.15), width: 1),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.04), // Sombra mucho más suave
+                                          blurRadius: 15, // Más difuminada
+                                          offset: const Offset(0, 8), // Un poco más abajo para dar profundidad
+                                        )
+                                      ],
+                                    ),
+                                    // Material va DENTRO del Container y es transparente para mostrar el fondo
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      borderRadius: BorderRadius.circular(20),
+                                      clipBehavior: Clip.antiAlias, // Evita que el toque se salga de los bordes curvos
+                                      child: InkWell(
+                                        splashColor: Colors.indigo[100], // El toque toma el color de tu tema
+                                        highlightColor: Colors.indigo[100],
+                                        onTap: () {
+                                          if (item.containsKey("widget") && item["widget"] != null) {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(builder: (_) => item["widget"]),
+                                            );
+                                          }
+                                        },
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 20.0), // Mejor balance de espacios
+                                          child: Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              // Contenedor del Icono
+                                              Container(
+                                                padding: const EdgeInsets.all(14),
+                                                decoration: BoxDecoration(
+                                                  color: cardColor.withOpacity(0.1),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: Icon(
+                                                  item['icon'],
+                                                  size: 30,
+                                                  color: cardColor,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 16),
+                                              Text(
+                                                item['title'],
+                                                textAlign: TextAlign.center,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Color(0xFF2D3748),
+                                                  letterSpacing: 0.3,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }
+                            )
+                        ),
+
+                        const SizedBox(height: 32),
+                      ],
+                    ),
+                  )
               )
-            ),
-          ),
-        ],
+          )
+        ),
       ),
 
       // --- BOTÓN FLOTANTE (FAB) INTEGRADO PERFECTAMENTE EN EL NOTCH ---

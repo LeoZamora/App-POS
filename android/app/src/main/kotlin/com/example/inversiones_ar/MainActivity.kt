@@ -244,6 +244,53 @@ class MainActivity : FlutterActivity() {
         result.success(devicesList)
     }
 
+//    private fun connectToDevice(deviceAddress: String, result: MethodChannel.Result) {
+//        val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
+//        if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) {
+//            result.error("BLUETOOTH_ERROR", "Bluetooth adapter error or disabled.", null)
+//            return
+//        }
+//
+//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+//            ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+//            result.error("PERMISSION_DENIED_CONNECT_S", "BLUETOOTH_CONNECT permission not granted for Android 12+.", null)
+//            return
+//        }
+//
+//        val device: BluetoothDevice? = bluetoothAdapter.getRemoteDevice(deviceAddress)
+//
+//        if (device == null) {
+//            result.error("DEVICE_NOT_FOUND", "Device with address $deviceAddress not found.", null)
+//            return
+//        }
+//        Thread {
+//            try {
+//                val sppUuid: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+//                bluetoothSocket = device.createRfcommSocketToServiceRecord(sppUuid)
+//                bluetoothSocket?.connect()
+//                outputStream = bluetoothSocket?.outputStream
+//
+//                activity.runOnUiThread {
+//                    result.success("Connected to ${device.name ?: device.address}")
+//                }
+//            } catch (e: SecurityException) {
+//                activity.runOnUiThread {
+//                    result.error("CONNECTION_ERROR_SECURITY", "SecurityException: ${e.message}. Missing BLUETOOTH_CONNECT permission?", e.toString())
+//                }
+//            } catch (e: Exception) {
+//                activity.runOnUiThread {
+//                    result.error("CONNECTION_ERROR", "Failed to connect: ${e.message}", e.toString())
+//                }
+//                try {
+//                    bluetoothSocket?.close()
+//                } catch (closeException: Exception) {
+//                }
+//                bluetoothSocket = null
+//                outputStream = null
+//            }
+//        }.start()
+//    }
+
     private fun connectToDevice(deviceAddress: String, result: MethodChannel.Result) {
         val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
         if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) {
@@ -263,11 +310,49 @@ class MainActivity : FlutterActivity() {
             result.error("DEVICE_NOT_FOUND", "Device with address $deviceAddress not found.", null)
             return
         }
+
+        // IMPORTANTE: si el adaptador sigue en modo "discovery" (buscando
+        // dispositivos), el connect() de RFCOMM puede fallar o colgarse en
+        // muchas impresoras térmicas. Lo cancelamos por si acaso.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED) {
+            try {
+                bluetoothAdapter.cancelDiscovery()
+            } catch (e: SecurityException) {
+                // sin permiso de scan, simplemente seguimos
+            }
+        }
+
         Thread {
+            var socket: BluetoothSocket? = null
             try {
                 val sppUuid: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
-                bluetoothSocket = device.createRfcommSocketToServiceRecord(sppUuid)
-                bluetoothSocket?.connect()
+
+                // Intento 1: socket "seguro" estándar, vía SDP.
+                try {
+                    socket = device.createRfcommSocketToServiceRecord(sppUuid)
+                    socket.connect()
+                } catch (e: Exception) {
+                    Log.w("PrintAdapt", "Falló el socket estándar (${e.message}), probando fallback por canal RFCOMM 1")
+                    try {
+                        socket?.close()
+                    } catch (_: Exception) {
+                    }
+
+                    // Intento 2 (fallback): muchas impresoras térmicas
+                    // ESC/POS no implementan bien SDP y necesitan el canal
+                    // RFCOMM 1 directo, saltándose la negociación por UUID.
+                    // Esto es lo que corrige el error
+                    // "read failed, socket might closed or timeout, read ret: -1".
+                    val method = device.javaClass.getMethod(
+                        "createRfcommSocket",
+                        Int::class.javaPrimitiveType
+                    )
+                    socket = method.invoke(device, 1) as BluetoothSocket
+                    socket.connect()
+                }
+
+                bluetoothSocket = socket
                 outputStream = bluetoothSocket?.outputStream
 
                 activity.runOnUiThread {
@@ -275,14 +360,18 @@ class MainActivity : FlutterActivity() {
                 }
             } catch (e: SecurityException) {
                 activity.runOnUiThread {
-                    result.error("CONNECTION_ERROR_SECURITY", "SecurityException: ${e.message}. Missing BLUETOOTH_CONNECT permission?", e.toString())
+                    result.error(
+                        "CONNECTION_ERROR_SECURITY",
+                        "SecurityException: ${e.message}. Missing BLUETOOTH_CONNECT permission?",
+                        e.toString()
+                    )
                 }
             } catch (e: Exception) {
                 activity.runOnUiThread {
                     result.error("CONNECTION_ERROR", "Failed to connect: ${e.message}", e.toString())
                 }
                 try {
-                    bluetoothSocket?.close()
+                    socket?.close()
                 } catch (closeException: Exception) {
                 }
                 bluetoothSocket = null
@@ -327,6 +416,7 @@ class MainActivity : FlutterActivity() {
                     write(PrinterCommand.POS_Set_Bold(0))
                     write(PrinterCommand.POS_Set_FontSize(0, 0))
 
+                    // Solo imprimimos el logo si de verdad llegó uno.
                     val bmp = BitmapFactory.decodeByteArray(logoBytes, 0, logoBytes.size)
                     val maxWidth = 384
                     val resized = if (bmp.width > maxWidth) Bitmap.createScaledBitmap(bmp, maxWidth, bmp.height * maxWidth / bmp.width, true) else bmp
@@ -334,6 +424,8 @@ class MainActivity : FlutterActivity() {
                     val imageCmd = PrintPicture.POS_PrintBMP(centerBmp, centerBmp.width, 0)
                     write(imageCmd)
                     PrinterCommand.POS_Set_LF()?.let { write(it) }
+//                    if (logoBytes != null) {
+//                    }
 
                     // Imprimir texto
                     val printTextCmd = PrinterCommand.POS_Print_Text(
@@ -347,7 +439,7 @@ class MainActivity : FlutterActivity() {
 
                     flush()
                     activity.runOnUiThread {
-                        result.success("Factura enviada con imagen.")
+                        result.success(if (logoBytes != null) "Factura enviada con imagen." else "Factura enviada sin imagen.")
                     }
                 }
             } catch (e: Exception) {

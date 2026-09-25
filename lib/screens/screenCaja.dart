@@ -5,6 +5,7 @@ import 'package:inversiones_ar/dbModels/dbModels.dart';
 import 'package:inversiones_ar/features/providers/authProvider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:inversiones_ar/services/servicesPrinter.dart';
 import 'package:inversiones_ar/widgets/ToatsSnackBar.dart';
 import 'package:inversiones_ar/widgets/alertReusable.dart';
 import 'package:dropdown_flutter/custom_dropdown.dart';
@@ -14,18 +15,6 @@ import 'package:inversiones_ar/dbModels/models_type.dart';
 import '../widgets/overlayCircle.dart';
 
 // Modelo simple para representar un renglón en nuestra lista
-class DesgloseEfectivo {
-
-  final int valorDenominacion;
-  final int cantidad;
-
-  DesgloseEfectivo({
-    required this.valorDenominacion,
-    required this.cantidad,
-  });
-
-  double get subtotal => (valorDenominacion * cantidad).toDouble();
-}
 
 class CajaScreen extends ConsumerStatefulWidget {
   final bool isCierre;
@@ -44,6 +33,7 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
   List<CajaModel> _cajasDisponibles = [];
   final _observacionesController = TextEditingController();
   ResumenTotalesModel? _resumen;
+  AperturaCajaModel? _resumenCaja;
 
   String formattedNumber(double monto) {
     return NumberFormat("#,##0.00", "es_US").format(monto);
@@ -111,11 +101,13 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
 
       LoadingOverlay.show(context, message: 'Cargando datos...');
       final ResumenTotalesModel? resumen = await getResumenCajaTotales(idCaja);
+      final AperturaCajaModel? resumenCaja = await getAperturaCaja(idCaja);
       LoadingOverlay.hide();
 
       if (!mounted) return;
       setState(() {
         _resumen = resumen;
+        _resumenCaja = resumenCaja;
       });
 
     } catch (e) {
@@ -148,6 +140,8 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
 
     String msgLoader = widget.isCierre ? 'Arqueando caja' : 'Abriendo caja';
     String msgSucces = widget.isCierre ? 'Arqueo de caja exitoso' : 'Apertura de caja exitosa';
+    final printerService = ref.read(printerProvider);
+    String nombreUsuario = ref.read(authProvider).userPayload?.usuario ?? 'Usuario Desconocido';
 
     try {
       final Map<String, dynamic> data = {
@@ -183,15 +177,62 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
 
       LoadingOverlay.hide();
 
-      ToastSnackBar.show(context,
-          message: msgSucces,
-          type: ToastType.success
-      );
 
-      if(widget.isCierre) {
+      if (widget.isCierre) {
+        final valid = await AlertReusable.show(
+            context,
+            title: 'Imprimir ticket',
+            message: '¿Desea imprimir el ticket de arqueo?',
+            yesText: 'SI',
+            noText: 'NO',
+            icon: Icons.check_circle_outline_sharp,
+            primaryColor: Colors.indigo
+        );
+
+        bool ticketImpreso = false;
+
+        if (valid) {
+          ticketImpreso = await printerService.imprimirArqueoCaja(
+            context: context,
+            nombreCaja: _resumenCaja?.cajaNombre ?? 'N/A',
+            usuarioArqueo: nombreUsuario,
+            totalVentas: _resumen?.totalVentas ?? 0,
+            totalEgresos: _resumen?.totalRetiros ?? 0,
+            aperturaCon: _resumen?.efectivoApertura ?? 0,
+            desglose: _listaDesglose,
+          );
+        }
+
+        if (!mounted) return;
+
+        // Mostramos el resultado AQUÍ, antes de checkAuthStatus(), para que
+        // el usuario lo vea mientras todavía está en esta pantalla (después
+        // de checkAuthStatus(), es muy probable que ya lo hayan sacado de
+        // aquí por el redirect del router).
+        ToastSnackBar.show(
+          context,
+          message: valid && !ticketImpreso
+              ? 'Arqueo exitoso, pero no se pudo imprimir el ticket.'
+              : msgSucces,
+          type: ToastType.success,
+        );
+
+        // Pequeño margen para que la impresora térmica termine de imprimir
+        // físicamente (el invokeMethod ya se resolvió, pero la impresión en
+        // sí sigue unos segundos más del lado del hardware) antes de que
+        // checkAuthStatus() dispare la navegación fuera de esta pantalla.
+        await Future.delayed(const Duration(seconds: 3));
+
+        if (!mounted) return;
         await ref.read(authProvider.notifier).checkAuthStatus();
       } else {
         await ref.read(authProvider.notifier).openCaja(_cajaSeleccionada!.idCaja, response['data']['idAperturaCaja']);
+
+        if (!mounted) return;
+        ToastSnackBar.show(context,
+            message: msgSucces,
+            type: ToastType.success
+        );
       }
 
     } on DioException catch (e) {
@@ -213,9 +254,6 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
         type: ToastType.error,
       );
     } catch (e, stackTrace) {
-      print('ERROR: $e');
-      print(stackTrace);
-
       LoadingOverlay.hide();
       if (!mounted) return;
       ToastSnackBar.show(
