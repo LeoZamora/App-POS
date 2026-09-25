@@ -238,9 +238,9 @@ class ResumenTotalesModel {
 
   factory ResumenTotalesModel.fromMap(Map<String, dynamic> map) {
     return ResumenTotalesModel(
-      totalVentas: map['totalVentas'],
-      totalMercaderia: map['totalMercaderia'],
-      efectivoApertura: map['efectivoApertura'],
+      totalVentas: (map['totalVentas'] is num) ? (map['totalVentas'] as num).toDouble() : null,
+      totalMercaderia: (map['totalMercaderia'] is num) ? (map['totalMercaderia'] as num).toDouble() : null,
+      efectivoApertura: (map['efectivoApertura'] is num) ? (map['efectivoApertura'] as num).toDouble() : null,
       totalRetiros: map['totalRetiros'],
       totalEnCaja: map['totalEnCaja'],
       totalPedidos: map['totalPedidos'],
@@ -1172,6 +1172,7 @@ class VentaModel {
   String? ubicacion;
   String? fechaRegistro;
   String? usuarioRegistro;
+  String? tipoPago;
   double? descuento;
   double? iva;
   double? subTotal;
@@ -1190,6 +1191,7 @@ class VentaModel {
     this.ubicacion,
     this.fechaRegistro,
     this.usuarioRegistro,
+    this.tipoPago,
     this.estado,
     this.total,
     this.descuento,
@@ -1210,6 +1212,7 @@ class VentaModel {
       'ubicacion': ubicacion,
       'fechaRegistro': fechaRegistro,
       'usuarioRegistro': usuarioRegistro,
+      'tipoPago': tipoPago,
       'estado': estado,
       'total': total,
       'descuento': descuento,
@@ -1233,6 +1236,7 @@ class VentaModel {
       ubicacion: map['ubicacion']?.toString(),
       fechaRegistro: map['fechaRegistro']?.toString(),
       usuarioRegistro: map['usuarioRegistro']?.toString(),
+      tipoPago: map['tipoPago']?.toString(),
       estado: (map['estado'] is bool)
           ? map['estado'] as bool
           : (map['estado'] == 1), // default true si null
@@ -1326,6 +1330,8 @@ class DetalleVentaModel {
   int? idVenta;
   int? idProducto;
   double? cantidad;
+  double? descuento;
+  double? iva;
   double? precioUnitario;
   String? observaciones;
 
@@ -1334,6 +1340,8 @@ class DetalleVentaModel {
     this.idVenta,
     this.idProducto,
     this.cantidad,
+    this.descuento,
+    this.iva,
     this.precioUnitario,
     this.observaciones,
   });
@@ -1344,6 +1352,8 @@ class DetalleVentaModel {
       'idVenta': idVenta,
       'idProducto': idProducto,
       'cantidad': cantidad,
+      'descuento': descuento,
+      'iva': iva,
       'precioUnitario': precioUnitario,
       'observaciones': observaciones,
     };
@@ -1354,7 +1364,9 @@ class DetalleVentaModel {
       IdDetalleVenta: map['IdDetalleVenta'],
       idVenta: map['idVenta'],
       idProducto: map['idProducto'],
-      cantidad: map['cantidad'],
+      cantidad: (map['cantidad'] as num).toDouble(),
+      descuento: (map['descuento'] as num).toDouble(),
+      iva: (map['iva'] as num).toDouble(),
       precioUnitario: (map['precioUnitario'] as num).toDouble(),
       observaciones: map['observaciones'],
     );
@@ -1520,6 +1532,19 @@ class ClienteCredito {
 // "usuarioRegistro": "SoporteDevoD",
 // "estado": true
 // }
+
+class DesgloseEfectivo {
+
+  final int valorDenominacion;
+  final int cantidad;
+
+  DesgloseEfectivo({
+    required this.valorDenominacion,
+    required this.cantidad,
+  });
+
+  double get subtotal => (valorDenominacion * cantidad).toDouble();
+}
 
 class RetiroEfectivoModel {
   int? idRetiroCaja;

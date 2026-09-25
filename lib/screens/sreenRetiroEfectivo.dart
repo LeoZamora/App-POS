@@ -262,7 +262,7 @@ class _EgresosCapitalScreenState extends ConsumerState<EgresosCapitalScreen> {
                         const Icon(Icons.account_balance_wallet_outlined, color: Colors.indigo, size: 20),
                         const SizedBox(width: 8),
                         Text(
-                          'Disponible: C\$ ${formattedNumber(0)}',
+                          'Disponible: C\$ ${formattedNumber(_resumen?.totalEnCaja ?? 0)}',
                           style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.indigo, fontSize: 13),
                         ),
                       ],

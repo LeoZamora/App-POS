@@ -248,82 +248,6 @@ Future<Map<String, dynamic>?> postVentas(Map<String, dynamic> data, bool ventaRa
   }
 }
 
-
-// Future<Map<String, dynamic>?> postVentas(Map<String, dynamic> data, bool ventaRapida) async {
-//   final String urlApi = !ventaRapida ? '/v2/venta' : '/v2/ventas/ventas-rapidas';
-//
-//   try {
-//     final response = await apiClient.post(urlApi,
-//       options: Options(
-//         headers: <String, String>{
-//           'Content-Type': 'application/json',
-//         },
-//       ),
-//       data: json.encode(data)
-//     );
-//
-//     // String responseBody = response.data as String;
-//
-//     final dynamic body = response.data;
-//
-//     final Map<String, dynamic> parsedBody = body is String
-//         ? json.decode(body) as Map<String, dynamic>
-//         : body as Map<String, dynamic>;
-//
-//     return {
-//       "code": response.statusCode,
-//       "msg": parsedBody['msg'] ?? parsedBody['message'] ?? '',
-//       ...parsedBody,
-//     };
-//
-//   } on DioException catch (e) {
-//     // rethrow;
-//     if (e.response != null && e.response?.data != null) {
-//       final dynamic errorBody = e.response!.data;
-//       final Map<String, dynamic> parsedError = errorBody is String
-//           ? (json.decode(errorBody) as Map<String, dynamic>)
-//           : errorBody as Map<String, dynamic>;
-//
-//       return {
-//         "code": parsedError['code'] ?? e.response?.statusCode,
-//         "msg": parsedError['msg'] ??
-//             parsedError['message'] ??
-//             'Error al registrar la venta',
-//       };
-//     }
-//   } catch (e, stackTrace) {
-//     print('Stack trace: $stackTrace');
-//     throw Exception('Ocurrió un error inesperado al registrar la venta. $e');
-//   }
-// }
-
-// Future<Map<String, dynamic>?> postVentas(Map<String, dynamic> data, bool ventaRapida) async {
-//   final String urlApi = !ventaRapida ? 'Venta' : 'v2/ventas/ventas-rapidas';
-//   print(data);
-//   try {
-//     final response = await apiClient.post(urlApi,
-//         options: Options(
-//           headers: <String, String>{
-//             'Content-Type': 'application/json',
-//           },
-//         ),
-//         data: json.encode(data)
-//     );
-//
-//     String responseBody = response.data as String;
-//
-//     return {
-//       "code": response.statusCode,
-//       "msg": responseBody
-//     };
-//
-//   } on DioException catch (e) {
-//     rethrow;
-//   } catch (e) {
-//     throw Exception('Ocurrió un error inesperado al registrar la venta.');
-//   }
-// }
-
 Future<Map<String, dynamic>?> postPedidos(Map<String, dynamic> data) async {
   final String urlApi = '/pedidos';
   try {
@@ -474,8 +398,32 @@ Future<ResumenTotalesModel> getResumenCajaTotales(int idCaja) async {
     return resumenCaja;
   } on DioException catch (e) {
     rethrow;
-  } catch (e) {
+  } catch (e, stackTrace) {
     throw Exception('Ocurrió un error inesperado al obtener el resumen de caja.');
+  }
+}
+
+
+// COMBOBOX
+Future<List<GenericModelCombobox>> getFormasPago() async {
+  final String urlApi = '/modalidades/combobox';
+
+  try {
+    final response = await apiClient.get(urlApi);
+    final List<dynamic> formas = response.data as List<dynamic>;
+
+    final List<GenericModelCombobox> formasPago = formas.map((item) {
+      return GenericModelCombobox.fromMap(item as Map<String, dynamic>);
+    }).toList();
+
+    return formasPago;
+  } on DioException catch (e) {
+    print('ERROR $e');
+    rethrow;
+  } catch (e, stackTrace) {
+    print('ERROR $e');
+    print('STACK TRACE: $stackTrace');
+    throw Exception('Ocurrió un error inesperado al obtener los tipos de productos.');
   }
 }
 

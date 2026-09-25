@@ -41,74 +41,136 @@ class PrinterService with ChangeNotifier {
     return NumberFormat("#,##0.00", "es_US").format(monto);
   }
 
+
+  String generarPiePaginaDevoDigital({int ancho = 31}) {
+    const String texto = 'Impresiones DevoDigital';
+    if (texto.length >= ancho) return texto.substring(0, ancho);
+    final int espacios = (ancho - texto.length) ~/ 2;
+    return ' ' * espacios + texto;
+  }
+
+// Ancho del ticket en caracteres (típico para impresoras térmicas de 58mm
+// con fuente normal). Ajusta este número si tu impresora imprime más
+// angosto o más ancho de lo que se ve bien.
+
   String generarTextoFacturaConDetalle({
     required VentaModel? venta,
     required List<Map<String, dynamic>> productos,
     bool isCopy = false,
     bool? showIva = false,
-    ivaValue = 0,
+    double ivaValue = 0,
     double ivaPorcentaje = 15,
     double tipoCambio = 36.50,
     double pagaCon = 0.0,
+    double totalVenta = 0.0,
     double cambio = 0.0,
-    double descuento = 0.0
+    double descuento = 0.0,
+    String formaPago = '',
   }) {
+    const int _anchoTicket = 31;
     final buffer = StringBuffer();
+    final String symbolCor = 'C${String.fromCharCode(36)}';
+
+    String _centrar(String texto, [int ancho = _anchoTicket]) {
+      if (texto.length >= ancho) return texto.substring(0, ancho);
+      final int espacios = (ancho - texto.length) ~/ 2;
+      return ' ' * espacios + texto;
+    }
+
+    String _truncar(String texto, int maxLen) {
+      return texto.length <= maxLen ? texto : texto.substring(0, maxLen);
+    }
+
+    /// Arma una línea tipo "ETIQUETA        C$   123.45", alineando el valor
+    /// a la derecha dentro del ancho del ticket, sin tener que calcular
+    /// espacios a mano en cada llamada.
+    String _linea(String etiqueta, String valor, [int ancho = _anchoTicket]) {
+      final int espacios = ancho - etiqueta.length - valor.length;
+      return etiqueta + ' ' * (espacios > 1 ? espacios : 1) + valor;
+    }
 
     double subtotal = 0;
     for (var p in productos) {
       subtotal += p['cantidad'] * p['precioUnitario'];
     }
-    double total = (subtotal - descuento) + ivaValue;
 
-    buffer.writeln("        Migdalia's Market       ".toString());
-    buffer.writeln('       Tel: +505 2263-2783       '.toString());
-    buffer.writeln('Ticket No:            ${venta?.noVenta.toString().padLeft(5, '0')}');
-    buffer.writeln('Credito:                      ${venta?.credito == true ? 'SI' : 'NO'}');
-    buffer.writeln('Cliente : ${venta?.cliente.toString().padLeft(20)}');
-    buffer.writeln('Fecha:                ${venta?.fechaRegistro?.substring(0, 10)}');
+    final double ivaAplicado = (showIva ?? false) ? ivaValue : 0;
+    final double total = (subtotal - descuento) + ivaAplicado;
+
+    // --- ENCABEZADO ---
+    buffer.writeln(_centrar("Migdalia's Market"));
+    buffer.writeln(_centrar('Tel: +505 2263-2783'));
+    buffer.writeln('');
+    buffer.writeln('');
+    buffer.writeln(_linea('Ticket No:', venta?.noVenta.toString().padLeft(5, '0') ?? '- - -'));
+    buffer.writeln(_linea('Credito:', venta?.credito == true ? 'SI' : 'NO'));
+    buffer.writeln(_linea('Cliente:', _truncar(venta?.cliente?.toString() ?? 'N/A', 20)));
+    buffer.writeln(_linea('Fecha:', venta?.fechaRegistro?.substring(0, 10) ?? '- - -'));
     buffer.writeln('');
     buffer.writeln('Enviar a:');
     buffer.writeln(venta?.enviarA ?? "- - -");
+    buffer.writeln('');
     buffer.writeln('Descripcion:');
     buffer.writeln(venta?.observaciones ?? "- - -");
-    buffer.writeln('');
-    buffer.writeln('-------------------------------');
-    buffer.writeln('Cant   |  Producto  |  Total');
-    buffer.writeln('-------------------------------');
-    for (var p in productos) {
-      final cant = p['cantidad'].toString().padLeft(1).padRight(2);
-      final nombre = (p['nombre'] as String).padRight(8).substring(0, 8);
-      final totalLinea = (p['cantidad'] * p['precioUnitario'])
-          .toStringAsFixed(2)
-          .padLeft(6)
-          .substring(0, 6);
 
-      buffer.writeln('$cant | $nombre  | C\$$totalLinea');
+    // --- DETALLE DE PRODUCTOS ---
+
+    buffer.writeln('');
+    buffer.writeln('PRODUCTOS');
+    buffer.writeln('-' * _anchoTicket);
+
+    for (var p in productos) {
+      final cant = p['cantidad'].toString();
+      final nombre = (p['nombre'] as String);
+      final precio = (p['precioUnitario'] as num).toDouble();
+      final total = (p['total'] as num).toDouble();
+
+      buffer.writeln(nombre);
+      buffer.writeln('$cant x $symbolCor${formattedNumber(precio)}');
+      buffer.writeln('Desc: $symbolCor${p['descuento'] ?? 0.0}      $symbolCor${formattedNumber(total)}');
+      buffer.writeln('');
     }
 
-    final String symbolCor = 'C${String.fromCharCode(36)}';
-    final String symbolDolar = String.fromCharCode(36);
+    // --- TOTALES ---
+    buffer.writeln('');
+    buffer.writeln('RESUMEN');
+    buffer.writeln('-' * _anchoTicket);
+    buffer.writeln(_linea('SUBTOTAL', '$symbolCor${formattedNumber(subtotal)}'));
+
+    buffer.writeln(_linea('IVA ($ivaPorcentaje%)', '$symbolCor${formattedNumber(ivaAplicado)}'));
+
+    if (descuento > 0) {
+      buffer.writeln(_linea('DESCUENTO', '$symbolCor${formattedNumber(descuento)}'));
+    }
+
+    buffer.writeln(_linea('TOTAL', '$symbolCor${formattedNumber(totalVenta)}'));
+    buffer.writeln('');
+
+    // --- FORMA DE PAGO ---
+    buffer.writeln('-' * _anchoTicket);
+    buffer.writeln(_centrar(formaPago.isNotEmpty ? formaPago : ''));
+    buffer.writeln('');
+
+    final bool esEfectivo = formaPago.isEmpty || formaPago == 'Efectivo';
+    if (esEfectivo) {
+      buffer.writeln(_linea('PAGA CON', '$symbolCor${formattedNumber(pagaCon)}'));
+      buffer.writeln(_linea('CAMBIO', '$symbolCor${formattedNumber(cambio)}'));
+    }
+
+    // --- PIE DE TICKET ---
+    buffer.writeln('');
+    buffer.writeln(_centrar('!Gracias por su compra!'));
+    buffer.writeln(_centrar('Ante cualquier duda o'));
+    buffer.writeln(_centrar('consulta, comunicarse a'));
+    buffer.writeln(_centrar('+505 2263-2783'));
+    buffer.writeln('');
+    if (isCopy) {
+      buffer.writeln(_centrar('COPIA'));
+    }
 
     buffer.writeln('');
-    buffer.writeln('SUBTOTAL    :        ${symbolCor + formattedNumber(subtotal).padLeft(8)}');
-    buffer.writeln('IVA ($ivaPorcentaje%) :        ${symbolCor + ivaValue.toStringAsFixed(2).padLeft(8)}');
-    buffer.writeln('DESCUENTO    :        ${symbolCor + formattedNumber(descuento).padLeft(8)}');
-    buffer.writeln('TOTAL       :        ${symbolCor + formattedNumber(total).padLeft(8)}');
-    // buffer.writeln('TOTAL       :        ${symbolDolar + formattedNumber((total / tipoCambio)).padLeft(9)}');
-    // buffer.writeln('Tipo Cambio :        ${symbolCor + tipoCambio.toStringAsFixed(2).padLeft(8)}');
+    buffer.writeln(generarPiePaginaDevoDigital());
 
-    buffer.writeln('');
-
-    buffer.writeln('-------------------------------');
-    buffer.writeln('PAGA CON    :        ${symbolCor + formattedNumber(pagaCon).padLeft(8)}');
-    buffer.writeln('CAMBIO      :        ${symbolCor + formattedNumber(cambio).padLeft(8)}');
-
-    buffer.writeln('');
-    buffer.writeln('|   !Gracias por su compra!   |');
-    buffer.writeln('|   Ante cualquier duda  o    |\n|   consulta, comunicarse a   |\n|       +505 2263-2783        |');
-    buffer.writeln('|                             |');
-    buffer.writeln('|            ${isCopy ? 'COPIA' : '     '}            |');
 
     return buffer.toString();
   }
@@ -348,10 +410,12 @@ class PrinterService with ChangeNotifier {
     bool? showIva = false,
     double ivaPorcentaje = 15,
     double ivaValue = 0,
+    double totalVenta = 0.0,
     double tipoCambio = 36.50,
     double descuento = 0.0,
     double pagaCon = 0.0,
     double cambio = 0.0,
+    String formaPago = ''
   }) async {
     if (_selectedDeviceAddress == null) {
       ToastSnackBar.show(
@@ -378,11 +442,12 @@ class PrinterService with ChangeNotifier {
         showIva: showIva,
         ivaValue: ivaValue,
         descuento: descuento,
+        totalVenta: totalVenta,
         ivaPorcentaje: ivaPorcentaje,
         tipoCambio: tipoCambio,
         pagaCon: pagaCon,
         cambio: cambio,
-
+        formaPago: formaPago
       );
 
       final Map<String, dynamic> printPayload = {
@@ -393,12 +458,6 @@ class PrinterService with ChangeNotifier {
 
       final String? result = await platform.invokeMethod("printFactura", printPayload);
 
-      ToastSnackBar.show(
-        context,
-        message: 'Imprimiendo ticket...',
-        type: ToastType.success,
-        duration: const Duration(seconds: 3),
-      );
       return true;
     } on PlatformException catch (e) {
       if (e.code == "NOT_CONNECTED") {
@@ -459,6 +518,10 @@ class PrinterService with ChangeNotifier {
     buffer.writeln('');
     buffer.writeln('|            ${isCopy ? 'COPIA' : '     '}            |');
 
+    buffer.writeln('');
+    buffer.writeln(generarPiePaginaDevoDigital());
+
+
     return buffer.toString();
   }
 
@@ -502,6 +565,138 @@ class PrinterService with ChangeNotifier {
       ToastSnackBar.show(
         context,
         message: 'Imprimiendo comprobante de retiro...',
+        type: ToastType.success,
+        duration: const Duration(seconds: 3),
+      );
+      return true;
+    } on PlatformException catch (e) {
+      if (e.code == "NOT_CONNECTED") {
+        if (_selectedDeviceAddress != null) {
+          await connectToDevice(context, _selectedDeviceAddress!);
+          notifyListeners();
+        } else {
+          await showDeviceSelectionDialog(context);
+        }
+      }
+      return false;
+    } finally {
+      _isPrinting = false;
+      notifyListeners();
+    }
+  }
+
+  String generarTextoArqueoCaja({
+    required String nombreCaja,
+    required String usuarioArqueo,
+    required double totalVentas,
+    required double totalEgresos,
+    required double aperturaCon,
+    required List<DesgloseEfectivo> desglose,
+    bool isCopy = false,
+  }) {
+    final buffer = StringBuffer();
+    final String symbolCor = 'C${String.fromCharCode(36)}';
+
+    final double totalContado = desglose.fold<double>(0, (sum, item) => sum + item.subtotal);
+    final double totalEsperado = (aperturaCon + totalVentas) - totalEgresos;
+    final double diferencia = totalContado - totalEsperado;
+
+    final String fecha = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
+
+    buffer.writeln("        Migdalia's Market       ");
+    buffer.writeln('       Tel: +505 8652-6458       ');
+    buffer.writeln('');
+    buffer.writeln('         ARQUEO DE CAJA          ');
+    buffer.writeln('-------------------------------');
+    buffer.writeln('Caja       :  $nombreCaja');
+    buffer.writeln('Usuario    :  $usuarioArqueo');
+    buffer.writeln('Fecha      :  $fecha');
+    buffer.writeln('-------------------------------');
+    buffer.writeln('');
+    buffer.writeln('RESUMEN:');
+    buffer.writeln('Apertura      :   $symbolCor${formattedNumber(aperturaCon).padLeft(10)}');
+    buffer.writeln('Ventas      :   $symbolCor${formattedNumber(totalVentas).padLeft(10)}');
+    buffer.writeln('Egresos     :   $symbolCor${formattedNumber(totalEgresos).padLeft(10)}');
+    buffer.writeln('Esperado    :   $symbolCor${formattedNumber(totalEsperado).padLeft(10)}');
+    buffer.writeln('-------------------------------');
+    buffer.writeln('');
+    buffer.writeln('DESGLOSE DE EFECTIVO:');
+    buffer.writeln('-------------------------------');
+    buffer.writeln('Denom.  | Cant | Subtotal');
+    buffer.writeln('-------------------------------');
+
+    for (var item in desglose) {
+      if (item.cantidad <= 0) continue;
+
+      final denom = '$symbolCor${item.valorDenominacion}'.padRight(8);
+      final cant = item.cantidad.toString().padLeft(2).padRight(5);
+      final subtotal = formattedNumber(item.subtotal).padLeft(9);
+
+      buffer.writeln('$denom| $cant| $subtotal');
+    }
+
+    buffer.writeln('-------------------------------');
+    buffer.writeln('TOTAL CONTADO:');
+    buffer.writeln('        $symbolCor ${formattedNumber(totalContado)}');
+    buffer.writeln('-------------------------------');
+    buffer.writeln('');
+    buffer.writeln('Firma: ________________________');
+    buffer.writeln('');
+    buffer.writeln('|            ${isCopy ? 'COPIA' : '     '}            |');
+    buffer.writeln('');
+    buffer.writeln(generarPiePaginaDevoDigital());
+
+    return buffer.toString();
+  }
+
+  Future<bool> imprimirArqueoCaja({
+    required BuildContext context,
+    required String nombreCaja,
+    required String usuarioArqueo,
+    required double totalVentas,
+    required double totalEgresos,
+    required double aperturaCon,
+    required List<DesgloseEfectivo> desglose,
+    bool isCopy = false,
+  }) async {
+    if (_selectedDeviceAddress == null) {
+      ToastSnackBar.show(
+        context,
+        message: 'Por favor, selecciona y conecta una impresora primero.',
+        type: ToastType.warning,
+      );
+      await showDeviceSelectionDialog(context);
+      if (_selectedDeviceAddress == null) return false;
+    }
+
+    if (_isPrinting) return false;
+    _isPrinting = true;
+    notifyListeners();
+
+    try {
+      Uint8List? logoBytes = await _loadLogoBytes();
+
+      final String textoArqueo = generarTextoArqueoCaja(
+        nombreCaja: nombreCaja,
+        usuarioArqueo: usuarioArqueo,
+        totalVentas: totalVentas,
+        totalEgresos: totalEgresos,
+        desglose: desglose,
+        isCopy: isCopy,
+        aperturaCon: aperturaCon,
+      );
+
+      final Map<String, dynamic> printPayload = {
+        "text": textoArqueo,
+        "logo": logoBytes,
+        "result": _selectedDeviceAddress,
+      };
+
+      final String? result = await platform.invokeMethod("printFactura", printPayload);
+
+      ToastSnackBar.show(
+        context,
+        message: 'Imprimiendo arqueo de caja...',
         type: ToastType.success,
         duration: const Duration(seconds: 3),
       );

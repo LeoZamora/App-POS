@@ -77,51 +77,40 @@ class _VentasScreenState extends ConsumerState<VentasScreen> {
       return;
     }
 
-    final cliente = await getClienteById(ventaCard.idCliente ?? 0);
-
-    venta = ventaCard;
-
-    // venta['idVenta'] = ventaCard.idVenta;
-    // venta['noVenta'] = ventaCard.noVenta;
-    // venta['idCliente'] = cliente.idCliente;
-    // venta['nombre'] = cliente.nombre;
-    // venta['cliente'] = cliente.nombre;
-    // venta['enviarA'] = ventaCard.enviarA;
-    // venta['fechaRegistro'] = ventaCard.fechaRegistro;
-    // venta['credito'] = ventaCard.credito == 1 ? false : true;
-    // venta['ubicacion'] = ventaCard.ubicacion;
-    // venta['observaciones'] = ventaCard.observaciones;
-    // venta['usuarioRegistro'] = ventaCard.usuarioRegistro;
-
     // final detalle = await dbHelper.getDetalleVentas(idVenta);
-    final detalle = await getVentaById(idVenta);
+    final List<DetalleVentaModel> detalle = await getVentaById(idVenta);
 
     detalleVenta.clear();
 
     for (var item in detalle) {
       if (item.idProducto != null) {
         final producto = await getProductoById(item.idProducto as int);
+        final double cantidad = item.cantidad ?? 0;
+        final double precioUnitario = item.precioUnitario ?? 0;
+
         detalleVenta.add({
           "idProducto": producto.idProducto,
           "nombre": producto.nombre,
-          "cantidad": item.cantidad,
-          "precioUnitario": item.precioUnitario,
+          "cantidad": cantidad,
+          "precioUnitario": precioUnitario,
           "observaciones": item.observaciones,
+          "total": precioUnitario * cantidad,
         });
       }
     }
 
     await printerService.imprimirFactura(
       context: context,
-      venta: venta,
+      venta: ventaCard,
       productos: detalleVenta,
       isCopy: true,
       showIva: true,
       ivaPorcentaje: 15,
       tipoCambio: 36.50,
-      descuento: venta?.descuento ?? 0,
-      ivaValue: venta?.iva ?? 0,
-
+      descuento: ventaCard.descuento ?? 0,
+      ivaValue: ventaCard.iva ?? 0,
+      totalVenta: ventaCard.total ?? 0,
+      formaPago: ventaCard.tipoPago ?? 'N/A',
     );
   }
 
@@ -166,16 +155,21 @@ class _VentasScreenState extends ConsumerState<VentasScreen> {
       backgroundColor: Colors.grey[200],
       appBar: AppBar(
         toolbarHeight: 80,
-        backgroundColor: Colors.white,
         foregroundColor: Colors.black,
-
+        backgroundColor: Colors.white,
         notificationPredicate: (ScrollNotification notification) {
           return notification.depth == 0;
         },
         surfaceTintColor: Colors.white,
-        // scrolledUnderElevation: 4,
-        // shadowColor: Colors.grey[200],
+        scrolledUnderElevation: 4,
+        shadowColor: Colors.grey[200],
         centerTitle: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(16),
+            bottomRight: Radius.circular(16),
+          ),
+        ),
         title: isSearching
           ? TextField(
             autofocus: true,
@@ -240,106 +234,6 @@ class _VentasScreenState extends ConsumerState<VentasScreen> {
       ),
       body: Column(
         children: [
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                  children: [
-                    // 1. Envolvemos el primer campo en Expanded
-                    Expanded(
-                      child: TextFormField(
-                        controller: fechaDesdeController,
-                        readOnly: true,
-                        keyboardType: TextInputType.datetime,
-                        decoration: const InputDecoration(
-                            labelText: 'Desde',
-                            labelStyle: TextStyle(color: Colors.grey),
-                            prefixIcon: Icon(Icons.calendar_month_outlined, color: Colors.grey),
-                            isDense: true,
-                            hintText: 'DD/MM/AAAA',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.all(Radius.circular(12)),
-                            )
-                        ),
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                        ),
-                        cursorHeight: 25,
-                        onTap: () async {
-                          FocusScope.of(context).requestFocus(FocusNode());
-
-                          DateTime? selectedDate = await showDatePicker(
-                            context: context,
-                            initialDate: DateTime.now(),
-                            firstDate: DateTime(2000),
-                            lastDate: DateTime(2050),
-                          );
-                          if (selectedDate != null) {
-                            String formattedDate =
-                                "${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}";
-                            print(formattedDate);
-                            fechaDesdeController.text = formattedDate;
-
-                            await getVentasRegistradas();
-                          }
-                        },
-                      ),
-                    ),
-
-                    // 2. Cambiamos height por width para separar los campos horizontalmente
-                    const SizedBox(width: 12),
-
-                    // 3. Envolvemos el segundo campo en Expanded
-                    Expanded(
-                      child: TextFormField(
-                        controller: fechaHastaController,
-                        readOnly: true,
-                        keyboardType: TextInputType.datetime,
-                        decoration: const InputDecoration(
-                            labelText: 'Hasta',
-                            labelStyle: TextStyle(color: Colors.grey),
-                            prefixIcon: Icon(Icons.calendar_month_outlined, color: Colors.grey),
-                            isDense: true,
-                            hintText: 'DD/MM/AAAA',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.all(Radius.circular(12)),
-                            )
-                        ),
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                        ),
-                        cursorHeight: 25,
-                        onTap: () async {
-                          FocusScope.of(context).requestFocus(FocusNode());
-
-                          DateTime? selectedDate = await showDatePicker(
-                            context: context,
-                            initialDate: DateTime.now(),
-                            firstDate: DateTime(2000),
-                            lastDate: DateTime.now(),
-                          );
-                          if (selectedDate != null) {
-                            String formattedDate =
-                                "${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}";
-                            fechaHastaController.text = formattedDate;
-
-                            await getVentasRegistradas();
-                          }
-                        },
-                      ),
-                    ),
-                  ]
-              ),
-            )
-          ),
-
-          const SizedBox(height: 12),
-
           Expanded(
             child: _ventasLocales.isEmpty
                 ? Center(
