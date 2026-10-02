@@ -62,6 +62,47 @@ class GenericModelCombobox {
   }
 }
 
+class DivisaModelCombobox {
+  int? id;
+  String? nombre;
+  String? codigo;
+  String? simbolo;
+  double? tasaCambio;
+  bool? esPredeterminada;
+
+  DivisaModelCombobox({
+    this.id,
+    this.nombre,
+    this.codigo,
+    this.simbolo,
+    this.tasaCambio,
+    this.esPredeterminada,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'nombre': nombre,
+      'codigo': codigo,
+      'simbolo': simbolo,
+      'tasaCambio': tasaCambio,
+      'esPredeterminada': esPredeterminada,
+    };
+  }
+
+  factory DivisaModelCombobox.fromMap(Map<String, dynamic> map) {
+    return DivisaModelCombobox(
+      id: map['id'],
+      nombre: map['nombre'],
+      codigo: map['codigo'],
+      simbolo: map['simbolo'],
+      tasaCambio: map['tasaCambio'],
+      esPredeterminada: map['esPredeterminada'],
+    );
+  }
+}
+
+
 class AperturaCajaModel {
   int? idAperturaCaja;
   int? idCaja;
@@ -1534,16 +1575,25 @@ class ClienteCredito {
 // }
 
 class DesgloseEfectivo {
-
+  final bool esDolar;
   final int valorDenominacion;
   final int cantidad;
 
   DesgloseEfectivo({
+    required this.esDolar,
     required this.valorDenominacion,
     required this.cantidad,
   });
 
   double get subtotal => (valorDenominacion * cantidad).toDouble();
+
+  // Devuelve el subtotal SOLO si es un renglón en dólares; si es
+  // córdobas, devuelve 0. Así puedes sumar una lista completa sin
+  // tener que filtrar con .where() aparte.
+  double get subtotalDolares => esDolar ? subtotal : 0;
+
+  // El complemento: subtotal SOLO si es córdobas.
+  double get subtotalCordobas => esDolar ? 0 : subtotal;
 }
 
 class RetiroEfectivoModel {

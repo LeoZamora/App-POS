@@ -47,14 +47,31 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
 
   // Denominaciones disponibles
   final List<int> _denominaciones = [1000, 500, 200, 100, 50, 20, 10, 5, 1];
+  final List<int> _denominacionesDolares = [100, 50, 20, 10, 5, 2, 1];
   int _denominacionSeleccionada = 1000;
+  bool _esDolar = false;
+  // Agrega esto como campo de tu State (junto a tus otras variables):
+  final Map<String, GlobalKey> _denomKeys = {};
+  GlobalKey _keyParaDenominacion(num denom) {
+    final String cacheKey = '${_esDolar}_$denom';
+    return _denomKeys.putIfAbsent(cacheKey, () => GlobalKey());
+  }
 
   // Controlador para el campo de cantidad
   final TextEditingController _cantidadController = TextEditingController();
 
   // Calcula la suma de toda la lista
   double get _totalCaja {
-    return _listaDesglose.fold(0, (sum, item) => sum + item.subtotal);
+    return _listaDesglose
+        .where((item) => !item.esDolar)
+        .fold(0.0, (sum, item) => sum + item.subtotal);
+  }
+
+// Total en dólares: solo suma los renglones que SÍ son dólares.
+  double get _totalCajaDolares {
+    return _listaDesglose
+        .where((item) => item.esDolar)
+        .fold(0.0, (sum, item) => sum + item.subtotal);
   }
 
   // Agrega un nuevo renglón a la lista
@@ -72,12 +89,14 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
       if (indexExistente >= 0) {
         final itemActual = _listaDesglose[indexExistente];
         _listaDesglose[indexExistente] = DesgloseEfectivo(
+            esDolar: itemActual.esDolar,
             valorDenominacion: _denominacionSeleccionada,
             cantidad: itemActual.cantidad + cantidad
         );
       } else {
         // Si no existe, agregamos el nuevo renglón
         _listaDesglose.add(DesgloseEfectivo(
+            esDolar: _esDolar,
             valorDenominacion: _denominacionSeleccionada,
             cantidad: cantidad
         ));
@@ -149,6 +168,7 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
         "idUsuarioApertura": _idUsuarioApertura,
         "observaciones": _observacionesController.text,
         "desgloceDetalle": _listaDesglose.map((item) => {
+          "idDivisa": item.esDolar ? 2 : 1,
           "valorDenominacion": item.valorDenominacion,
           "cantidad": item.cantidad
         }).toList()
@@ -159,6 +179,7 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
         "montoArqueoRetiros": _resumen?.totalRetiros ?? 0,
         "observaciones": _observacionesController.text,
         "desgloceDetalle":  _listaDesglose.map((item) => {
+          "idDivisa": item.esDolar ? 2 : 1,
           "valorDenominacion": item.valorDenominacion,
           "cantidad": item.cantidad
         }).toList()
@@ -518,22 +539,112 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
 
                                 if(widget.isCierre) _buildResumenCard(),
 
+                                // const SizedBox(height: 10),
+
                                 const SizedBox(height: 10),
 
                                 // --- ZONA DE CAPTURA DE DENOMINACIONES ---
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.payments_outlined, size: 18, color: Colors.black87),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        'Desglose de efectivo',
-                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.grey.shade800),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.payments_outlined, size: 18, color: Colors.black87),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Desglose de efectivo',
+                                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.grey.shade800),
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                    // const Spacer(),
+                                    Container(
+                                      height: 50,
+                                      width: 100,
+                                      padding: const EdgeInsets.all(3),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey[200],
+                                        borderRadius: BorderRadius.circular(50),
+                                      ),
+                                      child: Stack(
+                                        children: [
+                                          // Fondo animado
+                                          AnimatedAlign(
+                                            duration: const Duration(milliseconds: 280),
+                                            curve: Curves.easeInOutCubic,
+                                            alignment: _esDolar
+                                                ? Alignment.centerRight
+                                                : Alignment.centerLeft,
+                                            child: Container(
+                                              width: 50,
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xff1a237e),
+                                                borderRadius: BorderRadius.circular(50),
+                                              ),
+                                            ),
+                                          ),
+
+                                          // Botones
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: InkWell(
+                                                  borderRadius: BorderRadius.circular(18),
+                                                  onTap: () {
+                                                    setState(() {
+                                                      _esDolar = false;
+                                                    });
+                                                  },
+                                                  child: Center(
+                                                    child: AnimatedDefaultTextStyle(
+                                                      duration: const Duration(milliseconds: 200),
+                                                      style: TextStyle(
+                                                        color: !_esDolar
+                                                            ? Colors.white
+                                                            : Colors.grey[600],
+                                                        fontSize: 14,
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                      child: const Text('C\$'),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+
+                                              Expanded(
+                                                child: InkWell(
+                                                  borderRadius: BorderRadius.circular(18),
+                                                  onTap: () {
+                                                    setState(() {
+                                                      _esDolar = true;
+                                                    });
+                                                  },
+                                                  child: Center(
+                                                    child: AnimatedDefaultTextStyle(
+                                                      duration: const Duration(milliseconds: 200),
+                                                      style: TextStyle(
+                                                        color: _esDolar
+                                                            ? Colors.white
+                                                            : Colors.grey[600],
+                                                        fontSize: 14,
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                      child: const Text('\$'),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ]
                                 ),
+
                                 const SizedBox(height: 12),
 
                                 Container(
@@ -559,18 +670,35 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
                                         height: 40,
                                         child: ListView.separated(
                                           scrollDirection: Axis.horizontal,
-                                          itemCount: _denominaciones.length,
+                                          shrinkWrap: true,
+                                          itemCount: _esDolar ? _denominacionesDolares.length : _denominaciones.length,
                                           separatorBuilder: (_, __) => const SizedBox(width: 8),
                                           itemBuilder: (context, index) {
-                                            final denom = _denominaciones[index];
+                                            final denom = _esDolar ? _denominacionesDolares[index] : _denominaciones[index];
                                             final bool isSelected = _denominacionSeleccionada == denom;
+                                            final GlobalKey itemKey = _keyParaDenominacion(denom);
 
                                             return ChoiceChip(
-                                              label: Text('C\$ $denom'),
+                                              label: _esDolar ? Text('\$ $denom') : Text('C\$ $denom'),
+                                              key: itemKey,
                                               selected: isSelected,
+                                              showCheckmark: true,
+                                              checkmarkColor: Colors.white,
                                               onSelected: (_) {
                                                 setState(() {
                                                   _denominacionSeleccionada = denom;
+                                                });
+
+                                                WidgetsBinding.instance.addPostFrameCallback((_) {
+                                                  final ctx = itemKey.currentContext;
+                                                  if (ctx != null) {
+                                                    Scrollable.ensureVisible(
+                                                      ctx,
+                                                      alignment: 0.5, // 0 = al inicio, 0.5 = centrado, 1 = al final
+                                                      duration: const Duration(milliseconds: 300),
+                                                      curve: Curves.easeInOut,
+                                                    );
+                                                  }
                                                 });
                                               },
                                               selectedColor: const Color(0xff1a237e),
@@ -652,91 +780,68 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
                                     shrinkWrap: true,
                                     physics: const NeverScrollableScrollPhysics(),
                                     itemCount: _listaDesglose.length,
-                                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                                    separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade100),
                                     itemBuilder: (context, index) {
                                       final item = _listaDesglose[index];
 
-                                      return Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius: BorderRadius.circular(14),
-                                          border: Border.all(color: Colors.grey.shade200),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black.withOpacity(0.03),
-                                              blurRadius: 6,
-                                              offset: const Offset(0, 2),
-                                            ),
-                                          ],
-                                        ),
+                                      return Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
                                         child: Row(
                                           children: [
-                                            // Badge de la denominación (grande, legible)
+                                            // Punto de color como acento, en vez de un badge cuadrado grande.
                                             Container(
-                                              width: 58,
-                                              height: 58,
-                                              alignment: Alignment.center,
+                                              width: 8,
+                                              height: 8,
+                                              margin: const EdgeInsets.only(top: 6),
                                               decoration: BoxDecoration(
-                                                color: Colors.green.shade50,
-                                                borderRadius: BorderRadius.circular(12),
-                                              ),
-                                              child: Column(
-                                                mainAxisAlignment: MainAxisAlignment.center,
-                                                children: [
-                                                  Text(
-                                                    'C\$',
-                                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.green.shade700),
-                                                  ),
-                                                  Text(
-                                                    '${item.valorDenominacion}',
-                                                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.green.shade700),
-                                                  ),
-                                                ],
+                                                color: item.esDolar ? Colors.green.shade400 : Colors.indigo.shade400,
+                                                shape: BoxShape.circle,
                                               ),
                                             ),
-                                            const SizedBox(width: 14),
+                                            const SizedBox(width: 12),
 
-                                            // Cantidad + precio unitario
+                                            // Denominación + cantidad como texto principal; precio unitario
+                                            // como texto secundario debajo.
                                             Expanded(
                                               child: Column(
                                                 crossAxisAlignment: CrossAxisAlignment.start,
                                                 children: [
                                                   Text(
-                                                    '${item.cantidad} pieza(s)',
-                                                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.black87),
+                                                    '${item.esDolar ? '\$' : 'C\$'}${item.valorDenominacion}  ×  ${item.cantidad}',
+                                                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: Colors.black87),
                                                   ),
-                                                  const SizedBox(height: 3),
+                                                  const SizedBox(height: 2),
                                                   Text(
-                                                    'C\$ ${item.valorDenominacion} c/u',
+                                                    '${item.esDolar ? '\$' : 'C\$'} ${item.valorDenominacion} c/u',
                                                     style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
                                                   ),
                                                 ],
                                               ),
                                             ),
 
-                                            // Subtotal + eliminar
-                                            Column(
-                                              crossAxisAlignment: CrossAxisAlignment.end,
-                                              children: [
-                                                Text(
-                                                  'C\$ ${item.subtotal.toStringAsFixed(2)}',
-                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Colors.indigo),
-                                                ),
-                                                const SizedBox(height: 6),
-                                                InkWell(
-                                                  borderRadius: BorderRadius.circular(20),
-                                                  onTap: () => _eliminarRenglon(index),
-                                                  child: Padding(
-                                                    padding: const EdgeInsets.all(2.0),
-                                                    child: Icon(Icons.delete_outline_rounded, size: 20, color: Colors.red.shade300),
-                                                  ),
-                                                ),
-                                              ],
+                                            // Subtotal en negro (ya no indigo) para bajar el ruido visual.
+                                            Text(
+                                              '${item.esDolar ? '\$' : 'C\$'} ${item.subtotal.toStringAsFixed(2)}',
+                                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: Colors.black87),
+                                            ),
+                                            const SizedBox(width: 8),
+
+                                            // Eliminar: ícono sutil, sin fondo ni borde.
+                                            InkWell(
+                                              borderRadius: BorderRadius.circular(20),
+                                              onTap: () => _eliminarRenglon(index),
+                                              child: Padding(
+                                                padding: const EdgeInsets.all(4.0),
+                                                child: Icon(Icons.delete_outline_rounded, size: 18, color: Colors.red),
+                                              ),
                                             ),
                                           ],
                                         ),
                                       );
+
+// En el ListView/ListView.separated que envuelve estos renglones, usa
+// un divisor delgado en vez de SizedBox/sombra por tarjeta:
+// separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade100),
                                     },
                                   ),
                                 ],
@@ -769,17 +874,44 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
                                     color: Colors.green.shade50,
                                     borderRadius: BorderRadius.circular(12),
                                   ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(
-                                        'Total en Caja',
-                                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.grey.shade800),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            'Total en Caja',
+                                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.grey.shade800),
+                                          ),
+                                          Text(
+                                            'C\$ ${formattedNumber(_totalCaja)}',
+                                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green),
+                                          ),
+                                        ],
                                       ),
-                                      Text(
-                                        'C\$ ${formattedNumber(_totalCaja)}',
-                                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green),
-                                      ),
+
+                                      // Solo mostramos la línea de dólares si de verdad hay algo
+                                      // contado en dólares -- así no se ve vacío/raro cuando la caja
+                                      // es 100% córdobas.
+                                      if (_totalCajaDolares > 0) ...[
+                                        const SizedBox(height: 10),
+                                        Divider(height: 1, color: Colors.green.shade100),
+                                        const SizedBox(height: 10),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              'En dólares',
+                                              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                                            ),
+                                            Text(
+                                              '\$ ${formattedNumber(_totalCajaDolares)}',
+                                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.green.shade700),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ],
                                   ),
                                 ),
