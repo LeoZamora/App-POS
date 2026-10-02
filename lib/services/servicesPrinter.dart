@@ -596,8 +596,12 @@ class PrinterService with ChangeNotifier {
   }) {
     final buffer = StringBuffer();
     final String symbolCor = 'C${String.fromCharCode(36)}';
+    final String symbolDol = String.fromCharCode(36);
+    String symbol(bool esDolar) => esDolar ? symbolDol : symbolCor;
 
-    final double totalContado = desglose.fold<double>(0, (sum, item) => sum + item.subtotal);
+
+    final double totalContado = desglose.where((item) => !item.esDolar).fold<double>(0, (sum, item) => sum + item.subtotal);
+    final double totalContadoDol = desglose.where((item) => item.esDolar).fold<double>(0, (sum, item) => sum + item.subtotalDolares);
     final double totalEsperado = (aperturaCon + totalVentas) - totalEgresos;
     final double diferencia = totalContado - totalEsperado;
 
@@ -628,16 +632,18 @@ class PrinterService with ChangeNotifier {
     for (var item in desglose) {
       if (item.cantidad <= 0) continue;
 
-      final denom = '$symbolCor${item.valorDenominacion}'.padRight(8);
+      final denom = '${symbol(item.esDolar)}${item.valorDenominacion}'.padRight(8);
       final cant = item.cantidad.toString().padLeft(2).padRight(5);
-      final subtotal = formattedNumber(item.subtotal).padLeft(9);
+      final subtotal = formattedNumber(item.esDolar ? item.subtotalDolares : item.subtotal).padLeft(9);
 
       buffer.writeln('$denom| $cant| $subtotal');
     }
 
     buffer.writeln('-------------------------------');
-    buffer.writeln('TOTAL CONTADO:');
+    buffer.writeln('TOTAL CONTADO $symbolCor:');
     buffer.writeln('        $symbolCor ${formattedNumber(totalContado)}');
+    buffer.writeln('TOTAL CONTADO $symbolDol:');
+    buffer.writeln('        $symbolDol ${formattedNumber(totalContadoDol)}');
     buffer.writeln('-------------------------------');
     buffer.writeln('');
     buffer.writeln('Firma: ________________________');

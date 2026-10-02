@@ -602,6 +602,25 @@ Future<List<GenericModelCombobox>> getConceptosCombobox() async {
   }
 }
 
+Future<List<DivisaModelCombobox>> getDivisasCombobox() async {
+  final String urlApi = '/divisas/combobox';
+
+  try {
+    final response = await apiClient.get(urlApi);
+    final List<dynamic> divisas = response.data as List<dynamic>;
+
+    final List<DivisaModelCombobox> categoriasModel = divisas.map((item) {
+      return DivisaModelCombobox.fromMap(item as Map<String, dynamic>);
+    }).toList();
+
+    return categoriasModel;
+  } on DioException catch (e) {
+    rethrow;
+  } catch (e) {
+    throw Exception('Ocurrió un error inesperado al obtener los tipos de productos.');
+  }
+}
+
 Future<List<RetiroEfectivoModel>> getRetirosEfectivo(int idApertura) async {
   final String url = '/retiros-caja?idAperturaCaja=$idApertura';
 
