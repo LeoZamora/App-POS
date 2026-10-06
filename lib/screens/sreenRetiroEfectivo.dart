@@ -1,6 +1,4 @@
 import 'dart:async';
-
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -9,11 +7,8 @@ import 'package:inversiones_ar/helpers/formatters.dart';
 import 'package:inversiones_ar/services/servicesPrinter.dart';
 import 'package:inversiones_ar/widgets/alertReusable.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
-
 import 'package:inversiones_ar/requestHttp/requestHttp.dart';
-
 import '../features/providers/authProvider.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inversiones_ar/dbModels/dbModels.dart';
 import 'package:inversiones_ar/widgets/ToatsSnackBar.dart';
 import 'package:inversiones_ar/widgets/overlayCircle.dart';
@@ -88,10 +83,6 @@ class _EgresosCapitalScreenState extends ConsumerState<EgresosCapitalScreen> {
     }
 
     try {
-      // if (printerService.selectedDeviceAddress == null) {
-      //   await printerService.showDeviceSelectionDialog(context);
-      // }
-
       final bool success = await printerService.imprimirRetiroCaja(
         context: context,
         retiro: item,
@@ -578,58 +569,60 @@ class _EgresosCapitalScreenState extends ConsumerState<EgresosCapitalScreen> {
           ? Center(
         child: LoadingAnimationWidget.threeArchedCircle(color: Colors.indigo, size: 40),
       )
-          : ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800),
-          child: RefreshIndicator(
-            color: Colors.indigo,
-            onRefresh: () async => _cargarDatos(ref.watch(authProvider).idCajaOpen, ref.watch(authProvider).idAperturaCaja),
-            child: SingleChildScrollView(
-              controller: _scrollController,
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildResumenCard(),
-                  const SizedBox(height: 28),
-                  Row(
-                    children: [
-                      const Icon(Icons.receipt_long_outlined, color: Colors.black),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Movimientos',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.black),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  _movimientos.isEmpty
-                      ? Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 40),
-                    child: Center(
-                      child: Column(
-                        children: [
-                          Icon(Icons.inbox_outlined, size: 64, color: Colors.grey[400]),
-                          const SizedBox(height: 16),
-                          Text(
-                            'NO HAY RETIROS REGISTRADOS',
-                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[600], fontSize: 14),
-                          ),
-                        ],
-                      ),
+          :  Center(
+        child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 800),
+            child: RefreshIndicator(
+              color: Colors.indigo,
+              onRefresh: () async => _cargarDatos(ref.watch(authProvider).idCajaOpen, ref.watch(authProvider).idAperturaCaja),
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildResumenCard(),
+                    const SizedBox(height: 28),
+                    Row(
+                      children: [
+                        const Icon(Icons.receipt_long_outlined, color: Colors.black),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Movimientos',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.black),
+                        ),
+                      ],
                     ),
-                  )
-                      : ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _movimientos.length,
-                    separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade100),
-                    itemBuilder: (context, index) => _buildMovimientoItem(_movimientos[index]),
-                  ),
-                ],
+                    const SizedBox(height: 12),
+                    _movimientos.isEmpty
+                        ? Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 40),
+                      child: Center(
+                        child: Column(
+                          children: [
+                            Icon(Icons.inbox_outlined, size: 64, color: Colors.grey[400]),
+                            const SizedBox(height: 16),
+                            Text(
+                              'NO HAY RETIROS REGISTRADOS',
+                              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[600], fontSize: 14),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                        : ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _movimientos.length,
+                      separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade100),
+                      itemBuilder: (context, index) => _buildMovimientoItem(_movimientos[index]),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          )
+            )
+        )
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _abrirDialogoNuevoRetiro(ref.watch(authProvider).idCajaOpen),

@@ -84,9 +84,8 @@ class MainActivity : FlutterActivity() {
 
                 "printFactura" -> {
                     val text = call.argument<String>("text")
-                    val logo = call.argument<ByteArray>("logo")
                     if (text != null) {
-                        printFactura(text, logo!!, result)
+                        printFactura(text, result)
                     } else {
                         result.error("INVALID_ARGUMENT", "Text cannot be null", null)
                         result.notImplemented()
@@ -397,7 +396,8 @@ class MainActivity : FlutterActivity() {
         return centerBitmap
     }
 
-    private fun printFactura(text: String, logoBytes: ByteArray, result: MethodChannel.Result) {
+//    private fun printFactura(text: String, logoBytes: ByteArray, result: MethodChannel.Result) {
+    private fun printFactura(text: String, result: MethodChannel.Result) {
         if (bluetoothSocket == null || outputStream == null || bluetoothSocket?.isConnected != true) {
             result.error("NOT_CONNECTED", "Not connected to any printer.", null)
             return
@@ -406,41 +406,22 @@ class MainActivity : FlutterActivity() {
         Thread {
             try {
                 outputStream?.run {
-                    Log.d("PrintAdapt", "Iniciando impresión")
-
-                    // Inicializar impresora
                     val initCmd = PrinterCommand.POS_Set_PrtInit()
                     if (initCmd != null) write(initCmd)
 
-                    // Negrita y tamaño fuente
                     write(PrinterCommand.POS_Set_Bold(0))
                     write(PrinterCommand.POS_Set_FontSize(0, 0))
 
-                    // Solo imprimimos el logo si de verdad llegó uno.
-                    val bmp = BitmapFactory.decodeByteArray(logoBytes, 0, logoBytes.size)
-                    val maxWidth = 384
-                    val resized = if (bmp.width > maxWidth) Bitmap.createScaledBitmap(bmp, maxWidth, bmp.height * maxWidth / bmp.width, true) else bmp
-                    val centerBmp = centerBitmap(resized, maxWidth)
-                    val imageCmd = PrintPicture.POS_PrintBMP(centerBmp, centerBmp.width, 0)
-                    write(imageCmd)
-                    PrinterCommand.POS_Set_LF()?.let { write(it) }
-//                    if (logoBytes != null) {
-//                    }
+                    PrinterCommand.POS_Print_Text(text, "US-ASCII", 0, 0, 0, 0)?.let { write(it) }
 
-                    // Imprimir texto
-                    val printTextCmd = PrinterCommand.POS_Print_Text(
-                        text, "US-ASCII", 0, 0, 0, 0
-                    )
-                    write(printTextCmd)
-                    // Feed
                     repeat(3) {
                         PrinterCommand.POS_Set_LF()?.let { write(it) }
                     }
 
                     flush()
-                    activity.runOnUiThread {
-                        result.success(if (logoBytes != null) "Factura enviada con imagen." else "Factura enviada sin imagen.")
-                    }
+                }
+                activity.runOnUiThread {
+                    result.success("Factura enviada.")
                 }
             } catch (e: Exception) {
                 Log.e("PrintAdapt", "Error durante impresión: ${e.message}")

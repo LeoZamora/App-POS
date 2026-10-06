@@ -2,8 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 final BaseOptions options = BaseOptions(
-  baseUrl: 'https://inversiones-zafiro.com/devodigital/api',
-  // baseUrl: 'https://89.117.72.48/devodigital/api',
+  // baseUrl: 'https://inversiones-zafiro.com/devodigital/api', // PROD
+  baseUrl: 'https://inversiones-zafiro.com/dev/api', // DEV
   connectTimeout: const Duration(seconds: 15),
   receiveTimeout: const Duration(seconds: 30),
   sendTimeout: const Duration(seconds: 30),

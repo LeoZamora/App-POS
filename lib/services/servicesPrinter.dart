@@ -43,7 +43,7 @@ class PrinterService with ChangeNotifier {
 
 
   String generarPiePaginaDevoDigital({int ancho = 31}) {
-    const String texto = 'Impresiones DevoDigital';
+    const String texto = 'devodigital.com';
     if (texto.length >= ancho) return texto.substring(0, ancho);
     final int espacios = (ancho - texto.length) ~/ 2;
     return ' ' * espacios + texto;
@@ -160,9 +160,9 @@ class PrinterService with ChangeNotifier {
     // --- PIE DE TICKET ---
     buffer.writeln('');
     buffer.writeln(_centrar('!Gracias por su compra!'));
-    buffer.writeln(_centrar('Ante cualquier duda o'));
-    buffer.writeln(_centrar('consulta, comunicarse a'));
-    buffer.writeln(_centrar('+505 2263-2783'));
+    // buffer.writeln(_centrar('Ante cualquier duda o'));
+    // buffer.writeln(_centrar('consulta, comunicarse a'));
+    // buffer.writeln(_centrar('+505 2263-2783'));
     buffer.writeln('');
     if (isCopy) {
       buffer.writeln(_centrar('COPIA'));
@@ -452,7 +452,7 @@ class PrinterService with ChangeNotifier {
 
       final Map<String, dynamic> printPayload = {
         "text": textoFactura,
-        "logo": logoBytes,
+        // "logo": logoBytes,
         "result": _selectedDeviceAddress,
       };
 
@@ -547,7 +547,7 @@ class PrinterService with ChangeNotifier {
     notifyListeners();
 
     try {
-      Uint8List? logoBytes = await _loadLogoBytes();
+      // Uint8List? logoBytes = await _loadLogoBytes();
 
       final String textoRetiro = generarTextoRetiroCaja(
         retiro: retiro,
@@ -556,7 +556,7 @@ class PrinterService with ChangeNotifier {
 
       final Map<String, dynamic> printPayload = {
         "text": textoRetiro,
-        "logo": logoBytes,
+        // "logo": logoBytes,
         "result": _selectedDeviceAddress,
       };
 
@@ -680,7 +680,7 @@ class PrinterService with ChangeNotifier {
     notifyListeners();
 
     try {
-      Uint8List? logoBytes = await _loadLogoBytes();
+      // Uint8List? logoBytes = await _loadLogoBytes();
 
       final String textoArqueo = generarTextoArqueoCaja(
         nombreCaja: nombreCaja,
@@ -694,7 +694,7 @@ class PrinterService with ChangeNotifier {
 
       final Map<String, dynamic> printPayload = {
         "text": textoArqueo,
-        "logo": logoBytes,
+        // "logo": logoBytes,
         "result": _selectedDeviceAddress,
       };
 

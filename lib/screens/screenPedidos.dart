@@ -271,492 +271,494 @@ class _PedidosScreenState extends ConsumerState<PedidosScreen>  with RouteAware 
         ],
       ),
 
-      body: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
-        child: SingleChildScrollView(
-          controller: _scrollController,
-          padding: const EdgeInsets.fromLTRB(0, 0, 0, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  children: [
-                    TextFormField(
-                      controller: noPedidoController,
-                      keyboardType: TextInputType.text,
-                      decoration: const InputDecoration(
-                          labelText: 'NO. Pedido',
-                          labelStyle: TextStyle(color: Colors.grey),
-                          prefixIcon: Icon(Icons.calendar_month_outlined, color: Colors.grey),
-                          isDense: true,
-                          hintText: 'PE-XX',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(12)),
-                          )
-                      ),
-                      style: TextStyle(
-                          color: Colors.grey[600],
-                          height: 2.5
-                      ),
-                      cursorHeight: 25,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Ingrese un número de pedido';
-                        }
-                        return null;
-                      },
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    DropdownFlutter<ClienteModel>.search(
-                      key: const ValueKey('clientes_combobox'),
-                      enabled: true,
-                      initialItem: _clienteSeleccionado,
-                      hintText: 'Seleccione un cliente',
-                      items: _clientes,
-                      excludeSelected: true,
-                      decoration: const CustomDropdownDecoration(
-                        expandedFillColor: Colors.white,
-                        hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
-                        headerStyle: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                        prefixIcon: Icon(Icons.people_outline_rounded, color: Colors.grey),
-
-                        // Bordes
-                        closedBorder: Border(
-                          top: BorderSide(color: Colors.grey),
-                          bottom: BorderSide(color: Colors.grey),
-                          left: BorderSide(color: Colors.grey),
-                          right: BorderSide(color: Colors.grey),
-                        ),
-
-                        closedSuffixIcon: Icon(Icons.keyboard_arrow_down_rounded, color: Colors.indigo),
-                        expandedSuffixIcon: Icon(Icons.keyboard_arrow_up_rounded, color: Colors.indigo),
-                      ),
-                      listItemBuilder: (context, item, isSelected, onItemSelected) {
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(item.nombre ?? ''),
-                            const SizedBox(height: 4),
-                            Text(
-                              'De: ${item.municipio ?? ''}',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 12,
-                              ),
-                            )
-                          ],
-                        );
-                      },
-                      validateOnChange: true,
-                      validator: (value) => value == null ? 'Seleccione un cliente' : null,
-                      headerBuilder: (context, selectedItem, enabled) {
-                        return Text(
-                          _clienteSeleccionado?.nombre ?? '',
-                          style: const TextStyle(
-                            fontSize: 16,
-                          ),
-                        );
-                      },
-                      onChanged: (val) async {
-                        if (val == null) return;
-
-                        setState(() {
-                          _clienteSeleccionado = val;
-                        });
-                      },
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    DropdownFlutter<GenericModelCombobox>.search(
-                      enabled: true,
-                      // Le damos un key estático ya que la lista no cambia de tamaño
-                      key: const ValueKey('estado_pedido_dropdown'),
-                      initialItem: _estadoSeleccionado,
-                      hintText: 'Seleccione un estado',
-                      decoration: const CustomDropdownDecoration(
-                        expandedFillColor: Colors.white,
-                        hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
-                        headerStyle: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                        prefixIcon: Icon(Icons.list_alt_rounded, color: Colors.grey),
-
-                        // Bordes
-                        closedBorder: Border(
-                          top: BorderSide(color: Colors.grey),
-                          bottom: BorderSide(color: Colors.grey),
-                          left: BorderSide(color: Colors.grey),
-                          right: BorderSide(color: Colors.grey),
-                        ),
-
-                        closedSuffixIcon: Icon(Icons.keyboard_arrow_down_rounded, color: Colors.indigo),
-                        expandedSuffixIcon: Icon(Icons.keyboard_arrow_up_rounded, color: Colors.indigo),
-                      ),
-                      items: _estadosPedido, // Pasamos la lista estática aquí
-                      headerBuilder: (context, selectedItem, enabled) {
-                        return Text(
-                          selectedItem.nombre ?? '',
-                          style: const TextStyle(
-                            fontSize: 16,
-                          ),
-                        );
-                      },
-                      listItemBuilder: (context, item, isSelected, onItemSelected) {
-                        return Text(item.nombre ?? '');
-                      },
-                      validateOnChange: true,
-                      validator: (value) => value == null ? 'Seleccione un estado' : null,
-                      onChanged: (value) {
-                        if (value != null) {
-                          // Como es setState dentro de un State normal o setDialogState si estás en un dialog
-                          setState(() {
-                            _estadoSeleccionado = value;
-                          });
-
-                          // Aquí puedes imprimir o usar value.id (ej. 5) para mandarlo a tu API
-                          // print('Estado seleccionado ID: ${value.id}');
-                        }
-                      },
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    Row(
-                        children: [
-                          // 1. Envolvemos el primer campo en Expanded
-                          Expanded(
-                            child: TextFormField(
-                              controller: fechaDesdeController,
-                              readOnly: true,
-                              keyboardType: TextInputType.datetime,
-                              decoration: const InputDecoration(
-                                  labelText: 'Desde',
-                                  labelStyle: TextStyle(color: Colors.grey),
-                                  prefixIcon: Icon(Icons.calendar_month_outlined, color: Colors.grey),
-                                  isDense: true,
-                                  hintText: 'DD/MM/AAAA',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.all(Radius.circular(12)),
-                                  )
-                              ),
-                              style: TextStyle(
-                                  color: Colors.grey[600],
-                                  height: 2.5
-                              ),
-                              cursorHeight: 25,
-                              onTap: () async {
-                                FocusScope.of(context).requestFocus(FocusNode());
-
-                                DateTime? selectedDate = await showDatePicker(
-                                  context: context,
-                                  initialDate: DateTime.now(),
-                                  firstDate: DateTime(2000),
-                                  lastDate: DateTime(2050),
-                                );
-                                if (selectedDate != null) {
-                                  String formattedDate =
-                                      "${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}";
-                                  print(formattedDate);
-                                  fechaDesdeController.text = formattedDate;
-                                }
-                              },
-                            ),
-                          ),
-
-                          // 2. Cambiamos height por width para separar los campos horizontalmente
-                          const SizedBox(width: 12),
-
-                          // 3. Envolvemos el segundo campo en Expanded
-                          Expanded(
-                            child: TextFormField(
-                              controller: fechaHastaController,
-                              readOnly: true,
-                              keyboardType: TextInputType.datetime,
-                              decoration: const InputDecoration(
-                                  labelText: 'Hasta',
-                                  labelStyle: TextStyle(color: Colors.grey),
-                                  prefixIcon: Icon(Icons.calendar_month_outlined, color: Colors.grey),
-                                  isDense: true,
-                                  hintText: 'DD/MM/AAAA',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.all(Radius.circular(12)),
-                                  )
-                              ),
-                              style: TextStyle(
-                                  color: Colors.grey[600],
-                                  height: 2.5
-                              ),
-                              cursorHeight: 25,
-                              onTap: () async {
-                                FocusScope.of(context).requestFocus(FocusNode());
-
-                                DateTime? selectedDate = await showDatePicker(
-                                  context: context,
-                                  initialDate: DateTime.now(),
-                                  firstDate: DateTime(2000),
-                                  lastDate: DateTime(2050),
-                                );
-                                if (selectedDate != null) {
-                                  String formattedDate =
-                                      "${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}";
-                                  fechaHastaController.text = formattedDate;
-                                }
-                              },
-                            ),
-                          ),
-                        ]
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    TextButton(
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.indigo,
-                          backgroundColor: Colors.indigo.withOpacity(0.1),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onPressed: () => _getPedidos(),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Text(
-                              "BUSCAR",
-                              style: TextStyle(
-                                color: Colors.indigo,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        )
-                    ),
-                  ],
-                ),
-              ),
-
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                child: pedidoDetalles.isEmpty
-                    ? Center(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            padding: const EdgeInsets.fromLTRB(0, 0, 0, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey[400]),
-                      const SizedBox(height: 16),
-                      Text(
-                        'NO HAY PEDIDOS CARGADOS',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[600], fontSize: 14),
+                      TextFormField(
+                        controller: noPedidoController,
+                        keyboardType: TextInputType.text,
+                        decoration: const InputDecoration(
+                            labelText: 'NO. Pedido',
+                            labelStyle: TextStyle(color: Colors.grey),
+                            prefixIcon: Icon(Icons.calendar_month_outlined, color: Colors.grey),
+                            isDense: true,
+                            hintText: 'PE-XX',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(12)),
+                            )
+                        ),
+                        style: TextStyle(
+                            color: Colors.grey[600],
+                            height: 2.5
+                        ),
+                        cursorHeight: 25,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Ingrese un número de pedido';
+                          }
+                          return null;
+                        },
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      DropdownFlutter<ClienteModel>.search(
+                        key: const ValueKey('clientes_combobox'),
+                        enabled: true,
+                        initialItem: _clienteSeleccionado,
+                        hintText: 'Seleccione un cliente',
+                        items: _clientes,
+                        excludeSelected: true,
+                        decoration: const CustomDropdownDecoration(
+                          expandedFillColor: Colors.white,
+                          hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
+                          headerStyle: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                          prefixIcon: Icon(Icons.people_outline_rounded, color: Colors.grey),
+
+                          // Bordes
+                          closedBorder: Border(
+                            top: BorderSide(color: Colors.grey),
+                            bottom: BorderSide(color: Colors.grey),
+                            left: BorderSide(color: Colors.grey),
+                            right: BorderSide(color: Colors.grey),
+                          ),
+
+                          closedSuffixIcon: Icon(Icons.keyboard_arrow_down_rounded, color: Colors.indigo),
+                          expandedSuffixIcon: Icon(Icons.keyboard_arrow_up_rounded, color: Colors.indigo),
+                        ),
+                        listItemBuilder: (context, item, isSelected, onItemSelected) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(item.nombre ?? ''),
+                              const SizedBox(height: 4),
+                              Text(
+                                'De: ${item.municipio ?? ''}',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 12,
+                                ),
+                              )
+                            ],
+                          );
+                        },
+                        validateOnChange: true,
+                        validator: (value) => value == null ? 'Seleccione un cliente' : null,
+                        headerBuilder: (context, selectedItem, enabled) {
+                          return Text(
+                            _clienteSeleccionado?.nombre ?? '',
+                            style: const TextStyle(
+                              fontSize: 16,
+                            ),
+                          );
+                        },
+                        onChanged: (val) async {
+                          if (val == null) return;
+
+                          setState(() {
+                            _clienteSeleccionado = val;
+                          });
+                        },
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      DropdownFlutter<GenericModelCombobox>.search(
+                        enabled: true,
+                        // Le damos un key estático ya que la lista no cambia de tamaño
+                        key: const ValueKey('estado_pedido_dropdown'),
+                        initialItem: _estadoSeleccionado,
+                        hintText: 'Seleccione un estado',
+                        decoration: const CustomDropdownDecoration(
+                          expandedFillColor: Colors.white,
+                          hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
+                          headerStyle: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                          prefixIcon: Icon(Icons.list_alt_rounded, color: Colors.grey),
+
+                          // Bordes
+                          closedBorder: Border(
+                            top: BorderSide(color: Colors.grey),
+                            bottom: BorderSide(color: Colors.grey),
+                            left: BorderSide(color: Colors.grey),
+                            right: BorderSide(color: Colors.grey),
+                          ),
+
+                          closedSuffixIcon: Icon(Icons.keyboard_arrow_down_rounded, color: Colors.indigo),
+                          expandedSuffixIcon: Icon(Icons.keyboard_arrow_up_rounded, color: Colors.indigo),
+                        ),
+                        items: _estadosPedido, // Pasamos la lista estática aquí
+                        headerBuilder: (context, selectedItem, enabled) {
+                          return Text(
+                            selectedItem.nombre ?? '',
+                            style: const TextStyle(
+                              fontSize: 16,
+                            ),
+                          );
+                        },
+                        listItemBuilder: (context, item, isSelected, onItemSelected) {
+                          return Text(item.nombre ?? '');
+                        },
+                        validateOnChange: true,
+                        validator: (value) => value == null ? 'Seleccione un estado' : null,
+                        onChanged: (value) {
+                          if (value != null) {
+                            // Como es setState dentro de un State normal o setDialogState si estás en un dialog
+                            setState(() {
+                              _estadoSeleccionado = value;
+                            });
+
+                            // Aquí puedes imprimir o usar value.id (ej. 5) para mandarlo a tu API
+                            // print('Estado seleccionado ID: ${value.id}');
+                          }
+                        },
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      Row(
+                          children: [
+                            // 1. Envolvemos el primer campo en Expanded
+                            Expanded(
+                              child: TextFormField(
+                                controller: fechaDesdeController,
+                                readOnly: true,
+                                keyboardType: TextInputType.datetime,
+                                decoration: const InputDecoration(
+                                    labelText: 'Desde',
+                                    labelStyle: TextStyle(color: Colors.grey),
+                                    prefixIcon: Icon(Icons.calendar_month_outlined, color: Colors.grey),
+                                    isDense: true,
+                                    hintText: 'DD/MM/AAAA',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.all(Radius.circular(12)),
+                                    )
+                                ),
+                                style: TextStyle(
+                                    color: Colors.grey[600],
+                                    height: 2.5
+                                ),
+                                cursorHeight: 25,
+                                onTap: () async {
+                                  FocusScope.of(context).requestFocus(FocusNode());
+
+                                  DateTime? selectedDate = await showDatePicker(
+                                    context: context,
+                                    initialDate: DateTime.now(),
+                                    firstDate: DateTime(2000),
+                                    lastDate: DateTime(2050),
+                                  );
+                                  if (selectedDate != null) {
+                                    String formattedDate =
+                                        "${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}";
+                                    print(formattedDate);
+                                    fechaDesdeController.text = formattedDate;
+                                  }
+                                },
+                              ),
+                            ),
+
+                            // 2. Cambiamos height por width para separar los campos horizontalmente
+                            const SizedBox(width: 12),
+
+                            // 3. Envolvemos el segundo campo en Expanded
+                            Expanded(
+                              child: TextFormField(
+                                controller: fechaHastaController,
+                                readOnly: true,
+                                keyboardType: TextInputType.datetime,
+                                decoration: const InputDecoration(
+                                    labelText: 'Hasta',
+                                    labelStyle: TextStyle(color: Colors.grey),
+                                    prefixIcon: Icon(Icons.calendar_month_outlined, color: Colors.grey),
+                                    isDense: true,
+                                    hintText: 'DD/MM/AAAA',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.all(Radius.circular(12)),
+                                    )
+                                ),
+                                style: TextStyle(
+                                    color: Colors.grey[600],
+                                    height: 2.5
+                                ),
+                                cursorHeight: 25,
+                                onTap: () async {
+                                  FocusScope.of(context).requestFocus(FocusNode());
+
+                                  DateTime? selectedDate = await showDatePicker(
+                                    context: context,
+                                    initialDate: DateTime.now(),
+                                    firstDate: DateTime(2000),
+                                    lastDate: DateTime(2050),
+                                  );
+                                  if (selectedDate != null) {
+                                    String formattedDate =
+                                        "${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}";
+                                    fechaHastaController.text = formattedDate;
+                                  }
+                                },
+                              ),
+                            ),
+                          ]
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      TextButton(
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.indigo,
+                            backgroundColor: Colors.indigo.withOpacity(0.1),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () => _getPedidos(),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text(
+                                "BUSCAR",
+                                style: TextStyle(
+                                  color: Colors.indigo,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          )
                       ),
                     ],
                   ),
-                )
-                    : ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: pedidoDetalles.length,
-                  itemBuilder: (context, index) {
-                    final pedido = pedidoDetalles[index];
-                    final fechaPlana = pedido.fechaRegistro?.split('T').first ?? 'N/A';
+                ),
 
-                    return Card(
-                      color: Colors.white,
-                      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 38,
-                                      height: 38,
-                                      decoration: BoxDecoration(
-                                        color: Colors.indigo.shade50,
-                                        borderRadius: BorderRadius.circular(10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                  child: pedidoDetalles.isEmpty
+                      ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey[400]),
+                        const SizedBox(height: 16),
+                        Text(
+                          'NO HAY PEDIDOS CARGADOS',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[600], fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  )
+                      : ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: pedidoDetalles.length,
+                    itemBuilder: (context, index) {
+                      final pedido = pedidoDetalles[index];
+                      final fechaPlana = pedido.fechaRegistro?.split('T').first ?? 'N/A';
+
+                      return Card(
+                        color: Colors.white,
+                        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 38,
+                                        height: 38,
+                                        decoration: BoxDecoration(
+                                          color: Colors.indigo.shade50,
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: const Icon(
+                                          Icons.receipt_long_rounded,
+                                          color: Colors.indigo,
+                                          size: 20,
+                                        ),
                                       ),
-                                      child: const Icon(
-                                        Icons.receipt_long_rounded,
-                                        color: Colors.indigo,
-                                        size: 20,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Column(
-                                      mainAxisAlignment: MainAxisAlignment.start,
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Text(
-                                              pedido.noPedido ?? 'Sin número',
-                                              style: const TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 16
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                              decoration: BoxDecoration(
-                                                color: pedido.isSolicitudCredito! ? Colors.orange.shade50 : Colors.green.shade50,
-                                                borderRadius: BorderRadius.circular(20),
-                                              ),
-                                              child: Text(
-                                                pedido.isSolicitudCredito! ? 'Crédito' : 'Contado',
-                                                style: TextStyle(
-                                                  color: pedido.isSolicitudCredito! ? Colors.orange.shade800 : Colors.green.shade800,
-                                                  fontWeight: FontWeight.w600,
-                                                  fontSize: 11,
+                                      const SizedBox(width: 8),
+                                      Column(
+                                        mainAxisAlignment: MainAxisAlignment.start,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Text(
+                                                pedido.noPedido ?? 'Sin número',
+                                                style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 16
                                                 ),
                                               ),
-                                            ),
-                                          ],
-                                        ),
-                                        Text(
-                                          formatedDate(pedido.fechaRegistro),
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey.shade500,
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                decoration: BoxDecoration(
+                                                  color: pedido.isSolicitudCredito! ? Colors.orange.shade50 : Colors.green.shade50,
+                                                  borderRadius: BorderRadius.circular(20),
+                                                ),
+                                                child: Text(
+                                                  pedido.isSolicitudCredito! ? 'Crédito' : 'Contado',
+                                                  style: TextStyle(
+                                                    color: pedido.isSolicitudCredito! ? Colors.orange.shade800 : Colors.green.shade800,
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 11,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                        ),
-                                      ],
-                                    )
-                                  ],
-                                ),
-
-                                const Spacer(),
-
-                                IconButton(
-                                    onPressed: () {
-                                      context.push('/pedido/${pedido.idPedido}');
-                                    },
-                                    color: Colors.indigo,
-                                    icon: Icon(Icons.visibility_outlined)
-                                ),
-
-                                // IconButton(
-                                //     onPressed: () {},
-                                //     color: Colors.grey,
-                                //     icon: Icon(Icons.print_outlined)
-                                // )
-                              ],
-                            ),
-                            const Divider(),
-                            const SizedBox(height: 8),
-
-                            Row(
-                              children: [
-                                const Icon(Icons.person_outline, size: 20, color: Colors.grey),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.start,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                          'Cliente',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey.shade500,
-                                          )
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        pedido.cliente ?? 'Cliente desconocido',
-                                        style: const TextStyle(fontSize: 14),
-                                        overflow: TextOverflow.ellipsis,
+                                          Text(
+                                            formatedDate(pedido.fechaRegistro),
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey.shade500,
+                                            ),
+                                          ),
+                                        ],
                                       )
                                     ],
                                   ),
-                                ),
-                                Row(
-                                  children: [
-                                    const Icon(Icons.calendar_today_outlined, size: 18, color: Colors.grey),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      formatedDate(pedido.fechaEntregaSolicitada),
-                                      style: const TextStyle(fontSize: 14, color: Colors.grey),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
 
-                            const SizedBox(height: 4),
+                                  const Spacer(),
 
-                            if (pedido.observaciones != null && pedido.observaciones!.trim().isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8.0),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.chat_bubble_outline_rounded,
-                                      size: 18,
-                                      color: Colors.amber.shade800,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Expanded( // Ahora el Expanded sabe exactamente hasta dónde crecer
-                                      child: Text(
-                                        pedido.observaciones!,
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey.shade700,
-                                          fontStyle: FontStyle.normal,
+                                  IconButton(
+                                      onPressed: () {
+                                        context.push('/pedido/${pedido.idPedido}');
+                                      },
+                                      color: Colors.indigo,
+                                      icon: Icon(Icons.visibility_outlined)
+                                  ),
+
+                                  // IconButton(
+                                  //     onPressed: () {},
+                                  //     color: Colors.grey,
+                                  //     icon: Icon(Icons.print_outlined)
+                                  // )
+                                ],
+                              ),
+                              const Divider(),
+                              const SizedBox(height: 8),
+
+                              Row(
+                                children: [
+                                  const Icon(Icons.person_outline, size: 20, color: Colors.grey),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.start,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                            'Cliente',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey.shade500,
+                                            )
                                         ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          pedido.cliente ?? 'Cliente desconocido',
+                                          style: const TextStyle(fontSize: 14),
+                                          overflow: TextOverflow.ellipsis,
+                                        )
+                                      ],
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.calendar_today_outlined, size: 18, color: Colors.grey),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        formatedDate(pedido.fechaEntregaSolicitada),
+                                        style: const TextStyle(fontSize: 14, color: Colors.grey),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
 
-                            const SizedBox(height: 12),
+                              const SizedBox(height: 4),
 
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'TOTAL C\$',
-                                  style: const TextStyle(fontSize: 14),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                Text(
-                                  'C\$ ${formattedNumber(pedido.totalAfecha ?? 0.00)}',
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                      color: Colors.indigo
+                              if (pedido.observaciones != null && pedido.observaciones!.trim().isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8.0),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.chat_bubble_outline_rounded,
+                                        size: 18,
+                                        color: Colors.amber.shade800,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Expanded( // Ahora el Expanded sabe exactamente hasta dónde crecer
+                                        child: Text(
+                                          pedido.observaciones!,
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey.shade700,
+                                            fontStyle: FontStyle.normal,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ],
-                            )
-                          ],
+
+                              const SizedBox(height: 12),
+
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'TOTAL C\$',
+                                    style: const TextStyle(fontSize: 14),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    'C\$ ${formattedNumber(pedido.totalAfecha ?? 0.00)}',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        color: Colors.indigo
+                                    ),
+                                  ),
+                                ],
+                              )
+                            ],
+                          ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       )
