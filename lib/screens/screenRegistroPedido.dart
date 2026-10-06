@@ -6,12 +6,8 @@ import 'package:inversiones_ar/dbModels/dbModels.dart';
 import 'package:inversiones_ar/requestHttp/requestHttp.dart';
 import 'package:inversiones_ar/services/servicesPrinter.dart';
 import 'package:internet_connection_checker/internet_connection_checker.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:inversiones_ar/services/geolocationServices.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:inversiones_ar/widgets/alertReusable.dart';
-import 'package:inversiones_ar/widgets/montosDialog.dart';
 import 'package:dropdown_flutter/custom_dropdown.dart';
 import 'package:inversiones_ar/widgets/overlayCircle.dart';
 import 'package:inversiones_ar/widgets/ToatsSnackBar.dart';
@@ -103,21 +99,8 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        showDialog<void>(
-          context: context,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              title: const Text('Fallo al cargar las categorias'),
-              content: Text(e.toString()),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('OK'),
-                ),
-              ],
-            );
-          },
-        );
+
+        ToastSnackBar.show(context, message: 'Fallo al cargar las categorías', type: ToastType.error);
       });
     }
   }
@@ -250,8 +233,6 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
     }
   }
 
-
-
   bool verifyData() {
     if(noVentaController.text.isEmpty ||
         clienteController.text.isEmpty ||
@@ -262,18 +243,6 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
       return false;
     }
     return true;
-  }
-
-  Future<void> _getClienteById(int idCliente) async {
-    try {
-      final response = await getClienteById(idCliente);
-      setState(() {
-        _clienteSeleccionado = response;
-        direcciones = response.direcciones ?? [];
-      });
-    } catch(e) {
-      if (!mounted) return;
-    }
   }
 
   Future<void> _imprimirFactura() async {
@@ -289,20 +258,6 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
         LoadingOverlay.show(context, message: 'Obteniendo ubicación...');
 
         String localidad = 'Ubicación no disponible';
-        // try {
-        //   Position position = await getCurrentLocation();
-        //   print('POSICION: ${position.toString()}');
-        //   localidad = await getLocalidad(position);
-        //   print('LOCALIDAD: $localidad');
-        //   LoadingOverlay.show(context, message: 'Ubicación obtenida');
-        //   Future.delayed(const Duration(milliseconds: 500), () {});
-        // } catch (e) {
-        //   LoadingOverlay.show(context, message: 'Ubicación no disponible');
-        //   Future.delayed(const Duration(milliseconds: 500), () {});
-        //   print('No se pudo obtener ubicación, se continúa sin ella: $e');
-        //   // localidad se queda en 'Ubicación no disponible'
-        // }
-
         setState(() {
           location = localidad;
           productosConnected.clear();
@@ -494,7 +449,7 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
     final formKey = GlobalKey<FormState>();
     bool existSubCat = false;
     bool existProd = false;
-    String? _mensajeErrorStock;
+    String? mensajeErrorStock;
 
     showDialog(
         context: context,
@@ -542,13 +497,11 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
                                 if (!mounted) return;
 
                                 if (_productoAdd == null) {
-                                  _mensajeErrorStock = 'Seleccione un producto';
+                                  mensajeErrorStock = 'Seleccione un producto';
                                   return;
                                 }
 
                                 final double cantidadIngresada = double.tryParse(_cantidadController.text) ?? 0;
-                                final double stockDisponibleTotal = _productoAdd?.cantidadTotal ?? 0;
-
                                 final int existIndex = detallePedido.indexWhere((item) => item['idProducto'] == (_productoAdd!.idProducto)
                                 );
 
@@ -556,16 +509,6 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
                                 if (existIndex != -1) {
                                   cantidadPrevia = (detallePedido[existIndex]['cantidad'] as num).toDouble();
                                 }
-
-                                final double stockRestante = stockDisponibleTotal - cantidadPrevia;
-                                // if (cantidadIngresada > stockRestante) {
-                                //   setDialogState(() {
-                                //     _mensajeErrorStock = stockRestante > 0
-                                //         ? 'Solo quedan ${stockRestante.toStringAsFixed(0)} unidades disponibles'
-                                //         : 'Ya agregaste todo el stock disponible de este producto';
-                                //   });
-                                //   return;
-                                // }
 
                                 final catActual = _categoriaSeleccionada;
 
@@ -747,8 +690,7 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
 
                                 existProd = _productos.isEmpty ? false : true;
                               });
-
-                                                        },
+                            },
                           ),
 
                           const SizedBox(height: 16),
@@ -832,7 +774,7 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
 
                                 if (cantidadEnCarrito >= stockTotal) {
                                   setDialogState(() {
-                                    _mensajeErrorStock = 'Ya has agregado todo el stock disponible al detalle';
+                                    mensajeErrorStock = 'Ya has agregado todo el stock disponible al detalle';
                                     _productoSeleccionado = null;
                                   });
                                   return;
@@ -842,7 +784,7 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
                               await getProductoId(value.idProducto ?? 0);
 
                               setDialogState(() {
-                                _mensajeErrorStock = null;
+                                mensajeErrorStock = null;
                               });
                             },
                           ),
@@ -873,7 +815,7 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
 
                           const SizedBox(height: 16),
 
-                          if (_mensajeErrorStock != null) ...[
+                          if (mensajeErrorStock != null) ...[
                             Container(
                               width: double.infinity,
                               padding: const EdgeInsets.all(10),
@@ -888,7 +830,7 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      _mensajeErrorStock!,
+                                      mensajeErrorStock!,
                                       style: const TextStyle(color: Colors.red, fontSize: 13),
                                     ),
                                   ),
@@ -934,20 +876,6 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
     }
   }
 
-  void _mostrarDialogoMontos() async {
-    final result = await showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: ShowDialogMontos(
-          montoTotal: totalVenta,
-          impimir: _imprimirFactura,
-          isLoaded: isLoading,
-        ),
-      ),
-    );
-  }
-
   void _clearData() {
     setState(() {
       noVentaController.clear();
@@ -963,11 +891,6 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
       _direccionSeleccionada = null;
 
     });
-  }
-
-  Future<int> _getNumeroVenta() async {
-    final int numFact = await getNumFact();
-    return numFact;
   }
 
   String formattedNumber(double monto) {
@@ -1009,8 +932,10 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if(mounted) {
         LoadingOverlay.show(context, message: 'Cargando datos...');
-        await loadClientes();
-        await getCategoriaProducto();
+        await Future.wait([
+          loadClientes(),
+          getCategoriaProducto()
+        ]);
         LoadingOverlay.hide();
         ref.read(printerProvider).requestBluetoothPermissions(context: context);
         idAperturaCaja = ref.read(authProvider).idAperturaCaja;
@@ -1028,26 +953,6 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
   @override
   Widget build(BuildContext context) {
     String title = 'Registrar Pedido';
-
-    final estiloInput = InputDecorationTheme(
-      filled: true,
-      fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.grey),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.grey),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.indigo, width: 2),
-      ),
-      hintStyle: const TextStyle(color: Colors.grey),
-      labelStyle: const TextStyle(color: Colors.indigo),
-    );
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -1448,7 +1353,7 @@ class _RegistroPedidoState extends ConsumerState<RegistroPedido> {
 
                   const SizedBox(height: 8),
 
-                  detallePedido.length == 0
+                  detallePedido.isEmpty
                       ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
